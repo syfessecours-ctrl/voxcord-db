@@ -25,10 +25,6 @@ if (isPostgres) {
 
 async function query(sql: string, params: any[] = []) {
   if (isPostgres) {
-    const res = await db.query(sql.replace(/\?/g, (match: any, i: any) => `$${params.indexOf(params[i]) + 1}`), params);
-    // Simple fix for param mapping if needed, but let's use a more robust way
-    const pgSql = sql.replace(/\?/g, (_, i) => `$${params.indexOf(params[i]) + 1}`); // This is naive
-    // Better:
     let count = 0;
     const betterPgSql = sql.replace(/\?/g, () => `$${++count}`);
     const result = await db.query(betterPgSql, params);
