@@ -102,8 +102,14 @@ export function ChatInterface({
   const [showFriendsView, setShowFriendsView] = useState(false);
   const [friendSearch, setFriendSearch] = useState('');
   const [isMuted, setIsMuted] = useState(false);
+  const [showCreateServerModal, setShowCreateServerModal] = useState(false);
+  const [newServerName, setNewServerName] = useState('');
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteTarget, setInviteTarget] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const peerRef = useRef<Peer | null>(null);
+  const myStreamRef = useRef<MediaStream | null>(null);
+  const callsRef = useRef<Record<string, any>>({});
   const remoteStreamsRef = useRef<Record<string, MediaStream>>({});
   const [remoteStreams, setRemoteStreams] = useState<number>(0); // Trigger re-render
 
@@ -142,18 +148,6 @@ export function ChatInterface({
     }
   };
 
-  const handleKick = (u: string) => {
-    const reason = prompt("Raison de l'expulsion ?");
-    if (reason) onKickUser(u, reason);
-    setSelectedUser(null);
-  };
-
-  const handleBan = (u: string) => {
-    const reason = prompt("Raison du bannissement ?");
-    if (reason) onBanUser(u, reason);
-    setSelectedUser(null);
-  };
-
   const handleSetRole = (u: string, role: string) => {
     onSetRole(u, role);
     setSelectedUser(null);
@@ -174,67 +168,90 @@ export function ChatInterface({
     return () => stopVoiceChat();
   }, [activeVoiceChannel]);
 
+  useEffect(() => {
+    const handleVoiceSignal = (e: any) => {
+      const { from, signal, username: fromUser } = e.detail;
+      if (peerRef.current && signal.type === 'peer-id') {
+        // Someone sent us their peer ID, call them if we are already in
+        if (activeVoiceChannel && !callsRef.current[from]) {
+          const call = peerRef.current.call(signal.peerId, myStreamRef.current!);
+          callsRef.current[from] = call;
+          call.on('stream', (remoteStream) => {
+            addRemoteStream(from, remoteStream);
+          });
+        }
+      }
+    };
+
+    window.addEventListener('vox_voice_signal' as any, handleVoiceSignal);
+    return () => window.removeEventListener('vox_voice_signal' as any, handleVoiceSignal);
+  }, [activeVoiceChannel]);
+
   const startVoiceChat = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      myStreamRef.current = stream;
       
-      // Initialize PeerJS
       const peer = new Peer();
       peerRef.current = peer;
 
       peer.on('open', (id) => {
         console.log('[Voice] My peer ID is: ' + id);
-        // We could send this ID to others, but PeerJS can also use socket IDs if we map them
-        // For simplicity, we'll use the peer's auto-generated ID
+        onJoinVoice(activeVoiceChannel!);
+        // Broadcast our peer ID to others in the channel
+        voiceUsers.forEach(vu => {
+          onSendVoiceSignal(vu.sid, { type: 'peer-id', peerId: id });
+        });
       });
 
       peer.on('call', (call) => {
         call.answer(stream);
         call.on('stream', (remoteStream) => {
+          // Find which user this is
+          const vu = voiceUsers.find(u => u.username === (call as any).peer); // This is a bit hacky with PeerJS auto IDs
           addRemoteStream(call.peer, remoteStream);
         });
       });
 
-      // When we join, we need to call everyone already there
-      // This requires the sid -> peerId mapping. 
-      // To keep it simple for this demo, we'll just handle the signaling via socket
-      onJoinVoice(activeVoiceChannel!);
     } catch (err) {
       console.error("Failed to start voice chat", err);
     }
   };
 
-  const addRemoteStream = (peerId: string, stream: MediaStream) => {
-    remoteStreamsRef.current[peerId] = stream;
+  const addRemoteStream = (id: string, stream: MediaStream) => {
+    remoteStreamsRef.current[id] = stream;
     setRemoteStreams(prev => prev + 1);
     
-    // Create audio element for the stream
     const audio = new Audio();
     audio.srcObject = stream;
     audio.play().catch(e => console.error("Audio play failed", e));
   };
 
   const stopVoiceChat = () => {
+    myStreamRef.current?.getTracks().forEach(track => track.stop());
+    myStreamRef.current = null;
     peerRef.current?.destroy();
     peerRef.current = null;
+    callsRef.current = {};
     remoteStreamsRef.current = {};
     setRemoteStreams(0);
     onLeaveVoice();
   };
 
   const handleCreateServer = () => {
-    console.log("[Chat] handleCreateServer clicked");
-    const name = prompt("Nom du serveur ?");
-    console.log("[Chat] Server name entered:", name);
-    if (name) {
-      onCreateServer(name);
+    if (newServerName.trim()) {
+      onCreateServer(newServerName);
+      setNewServerName('');
+      setShowCreateServerModal(false);
     }
   };
 
   const handleInvite = () => {
-    if (!activeServer) return;
-    const target = prompt("Pseudo de l'utilisateur à inviter ?");
-    if (target) onInviteToServer(activeServer, target);
+    if (activeServer && inviteTarget.trim()) {
+      onInviteToServer(activeServer, inviteTarget);
+      setInviteTarget('');
+      setShowInviteModal(false);
+    }
   };
 
   const currentServer = servers.find(s => s.id === activeServer);
@@ -287,7 +304,7 @@ export function ChatInterface({
 
         {!userOwnsServer && (
           <div 
-            onClick={handleCreateServer}
+            onClick={() => setShowCreateServerModal(true)}
             className="w-12 h-12 rounded-[24px] bg-[#111114] text-green-500 flex items-center justify-center transition-all cursor-pointer hover:bg-green-500 hover:text-white hover:rounded-[16px]"
             title="Créer un serveur"
           >
@@ -391,7 +408,7 @@ export function ChatInterface({
                       <span className="text-xs font-bold text-white">{username}</span>
                       <Mic size={12} className="ml-auto text-gray-500" />
                     </div>
-                    {voiceUsers.map(vu => (
+                    {voiceUsers.filter(vu => vu.username !== username).map(vu => (
                       <div key={vu.sid} className="flex items-center gap-2">
                         <div className="w-6 h-6 bg-white/10 rounded flex items-center justify-center text-white text-[10px] font-bold">
                           {vu.username[0].toUpperCase()}
@@ -405,7 +422,7 @@ export function ChatInterface({
 
               {currentServer?.owner === username && (
                 <button 
-                  onClick={handleInvite}
+                  onClick={() => setShowInviteModal(true)}
                   className="mt-4 mx-3 flex items-center justify-center gap-2 py-2 px-4 bg-[#00f2ff]/10 text-[#00f2ff] rounded-lg font-bold text-xs hover:bg-[#00f2ff]/20 transition-all"
                 >
                   <UserPlus size={14} />
@@ -741,7 +758,11 @@ export function ChatInterface({
                 )}
                 
                 <button 
-                  onClick={() => handleKick(selectedUser.username)}
+                  onClick={() => {
+                    const reason = prompt("Raison de l'expulsion ?");
+                    if (reason) onKickUser(selectedUser.username, reason);
+                    setSelectedUser(null);
+                  }}
                   className="w-full flex items-center gap-3 p-4 bg-white/5 hover:bg-orange-500/10 hover:text-orange-500 rounded-2xl transition-all font-bold text-sm"
                 >
                   <UserX size={20} />
@@ -749,7 +770,11 @@ export function ChatInterface({
                 </button>
                 {isOwner && (
                   <button 
-                    onClick={() => handleBan(selectedUser.username)}
+                    onClick={() => {
+                      const reason = prompt("Raison du bannissement ?");
+                      if (reason) onBanUser(selectedUser.username, reason);
+                      setSelectedUser(null);
+                    }}
                     className="w-full flex items-center gap-3 p-4 bg-white/5 hover:bg-red-500/10 hover:text-red-500 rounded-2xl transition-all font-bold text-sm"
                   >
                     <Ban size={20} />
@@ -762,6 +787,100 @@ export function ChatInterface({
                 >
                   Annuler
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Create Server Modal */}
+      <AnimatePresence>
+        {showCreateServerModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="w-full max-w-md bg-[#16161a] p-8 rounded-3xl border border-white/5 shadow-2xl"
+            >
+              <h2 className="text-2xl font-black text-white mb-2">Créer votre serveur</h2>
+              <p className="text-gray-500 text-sm mb-6">Donnez une personnalité à votre serveur avec un nom unique.</p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Nom du serveur</label>
+                  <input 
+                    type="text"
+                    value={newServerName}
+                    onChange={(e) => setNewServerName(e.target.value)}
+                    placeholder="Mon super serveur"
+                    className="w-full bg-[#0a0a0c] border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#00f2ff]/30 transition-all"
+                    autoFocus
+                  />
+                </div>
+                
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    onClick={() => setShowCreateServerModal(false)}
+                    className="flex-1 py-3 px-4 bg-white/5 text-white rounded-xl font-bold hover:bg-white/10 transition-all"
+                  >
+                    Annuler
+                  </button>
+                  <button 
+                    onClick={handleCreateServer}
+                    disabled={!newServerName.trim()}
+                    className="flex-1 py-3 px-4 bg-[#00f2ff] text-[#0a0a0c] rounded-xl font-black hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100"
+                  >
+                    Créer
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Invite Modal */}
+      <AnimatePresence>
+        {showInviteModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="w-full max-w-md bg-[#16161a] p-8 rounded-3xl border border-white/5 shadow-2xl"
+            >
+              <h2 className="text-2xl font-black text-white mb-2">Inviter un ami</h2>
+              <p className="text-gray-500 text-sm mb-6">Entrez le pseudo de la personne que vous souhaitez inviter sur {currentServer?.name}.</p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Pseudo de l'utilisateur</label>
+                  <input 
+                    type="text"
+                    value={inviteTarget}
+                    onChange={(e) => setInviteTarget(e.target.value)}
+                    placeholder="Pseudo"
+                    className="w-full bg-[#0a0a0c] border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#00f2ff]/30 transition-all"
+                    autoFocus
+                  />
+                </div>
+                
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    onClick={() => setShowInviteModal(false)}
+                    className="flex-1 py-3 px-4 bg-white/5 text-white rounded-xl font-bold hover:bg-white/10 transition-all"
+                  >
+                    Annuler
+                  </button>
+                  <button 
+                    onClick={handleInvite}
+                    disabled={!inviteTarget.trim()}
+                    className="flex-1 py-3 px-4 bg-[#00f2ff] text-[#0a0a0c] rounded-xl font-black hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100"
+                  >
+                    Inviter
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>

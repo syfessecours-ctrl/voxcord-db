@@ -198,6 +198,12 @@ async function startServer() {
       if (userRecord) {
         const isValid = await bcrypt.compare(password, userRecord.password_hash);
         if (!isValid) return socket.emit("login_error", "Mot de passe incorrect.");
+        
+        // Ensure owner role is updated if username matches OWNER_USERNAME
+        if (username.toLowerCase() === OWNER_USERNAME.toLowerCase() && userRecord.role !== 'owner') {
+          await execute("UPDATE users SET role = 'owner' WHERE username = ?", [username]);
+          userRecord.role = 'owner';
+        }
       } else {
         const salt = await bcrypt.genSalt(10);
         const hash = await bcrypt.hash(password, salt);
@@ -406,8 +412,9 @@ async function startServer() {
       if (!request) return;
 
       if (response === 'accepted') {
+        const [u1, u2] = [request.from_user, request.to_user].sort();
         await execute("UPDATE friend_requests SET status = 'accepted' WHERE id = ?", [requestId]);
-        await execute("INSERT INTO friends (user1, user2, timestamp) VALUES (?, ?, ?) ON CONFLICT DO NOTHING", [request.from_user, request.to_user, new Date().toISOString()]);
+        await execute("INSERT INTO friends (user1, user2, timestamp) VALUES (?, ?, ?) ON CONFLICT DO NOTHING", [u1, u2, new Date().toISOString()]);
         
         // Notify both users
         const fromUserOnline = Array.from(users.values()).find(u => u.username === request.from_user);

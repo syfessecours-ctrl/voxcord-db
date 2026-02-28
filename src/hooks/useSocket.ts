@@ -116,6 +116,11 @@ export function useSocket(username: string) {
     newSocket.on('user_joined_voice', (user) => setVoiceUsers(prev => [...prev, user]));
     newSocket.on('user_left_voice', (sid) => setVoiceUsers(prev => prev.filter(u => u.sid !== sid)));
 
+    newSocket.on('voice_signal', (data) => {
+      // This will be handled by ChatInterface via an event listener or a ref
+      window.dispatchEvent(new CustomEvent('vox_voice_signal', { detail: data }));
+    });
+
     return newSocket;
   };
 
