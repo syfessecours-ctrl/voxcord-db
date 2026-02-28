@@ -23,7 +23,8 @@ import {
   Mic,
   MicOff,
   PhoneOff,
-  Server as ServerIcon
+  Server as ServerIcon,
+  Settings
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { User, Channel, Message, Friend, FriendRequest, PrivateMessage, Server as ServerType } from '../types';
@@ -104,6 +105,9 @@ export function ChatInterface({
   const [showFriendsView, setShowFriendsView] = useState(false);
   const [friendSearch, setFriendSearch] = useState('');
   const [isMuted, setIsMuted] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [echoCancellation, setEchoCancellation] = useState(true);
+  const [noiseSuppression, setNoiseSuppression] = useState(true);
   const [showCreateServerModal, setShowCreateServerModal] = useState(false);
   const [newServerName, setNewServerName] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -230,8 +234,8 @@ export function ChatInterface({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
+          echoCancellation,
+          noiseSuppression,
           autoGainControl: false, // Disabling this to fix "rollercoaster" volume swings
         } 
       });
@@ -543,9 +547,18 @@ export function ChatInterface({
               </select>
             </div>
           </div>
-          <button onClick={onLogout} className="p-2 hover:bg-white/5 rounded-lg text-gray-500 hover:text-red-500 transition-all">
-            <LogOut size={18} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={() => setShowSettingsModal(true)} 
+              className="p-2 hover:bg-white/5 rounded-lg text-gray-500 hover:text-[#00f2ff] transition-all"
+              title="Paramètres audio"
+            >
+              <Settings size={18} />
+            </button>
+            <button onClick={onLogout} className="p-2 hover:bg-white/5 rounded-lg text-gray-500 hover:text-red-500 transition-all">
+              <LogOut size={18} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -869,6 +882,76 @@ export function ChatInterface({
                   className="w-full p-4 text-gray-500 hover:text-white font-bold text-sm transition-all"
                 >
                   Annuler
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {showSettingsModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="w-full max-w-md bg-[#16161a] p-8 rounded-3xl border border-white/5 shadow-2xl"
+            >
+              <h2 className="text-2xl font-black text-white mb-2">Paramètres Audio</h2>
+              <p className="text-gray-500 text-sm mb-6">Ajustez vos préférences pour une meilleure expérience vocale.</p>
+              
+              <div className="space-y-6">
+                <div className="flex items-center justify-between p-4 bg-[#0a0a0c] rounded-2xl border border-white/5">
+                  <div>
+                    <div className="text-sm font-bold text-white">Annulation d'écho</div>
+                    <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Echo Cancellation</div>
+                  </div>
+                  <button 
+                    onClick={() => setEchoCancellation(!echoCancellation)}
+                    className={cn(
+                      "w-12 h-6 rounded-full transition-all relative",
+                      echoCancellation ? "bg-[#00f2ff]" : "bg-gray-700"
+                    )}
+                  >
+                    <div className={cn(
+                      "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                      echoCancellation ? "left-7" : "left-1"
+                    )} />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-[#0a0a0c] rounded-2xl border border-white/5">
+                  <div>
+                    <div className="text-sm font-bold text-white">Suppression du bruit</div>
+                    <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Noise Suppression</div>
+                  </div>
+                  <button 
+                    onClick={() => setNoiseSuppression(!noiseSuppression)}
+                    className={cn(
+                      "w-12 h-6 rounded-full transition-all relative",
+                      noiseSuppression ? "bg-[#00f2ff]" : "bg-gray-700"
+                    )}
+                  >
+                    <div className={cn(
+                      "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                      noiseSuppression ? "left-7" : "left-1"
+                    )} />
+                  </button>
+                </div>
+
+                <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-2xl">
+                  <p className="text-[10px] text-yellow-500 font-bold leading-relaxed">
+                    Note: Les changements prendront effet la prochaine fois que vous rejoindrez un salon vocal.
+                  </p>
+                </div>
+                
+                <button 
+                  onClick={() => setShowSettingsModal(false)}
+                  className="w-full py-4 bg-[#00f2ff] text-[#0a0a0c] rounded-2xl font-black hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  Fermer
                 </button>
               </div>
             </motion.div>
