@@ -135,23 +135,60 @@ async function initDb() {
   `;
 
   if (isPostgres) {
-    await db.query(schema.replace(/INTEGER PRIMARY KEY AUTOINCREMENT/g, 'SERIAL PRIMARY KEY'));
+    // Split schema into individual statements for better error handling in Postgres
+    const statements = schema
+      .replace(/INTEGER PRIMARY KEY AUTOINCREMENT/g, 'SERIAL PRIMARY KEY')
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+    
+    for (const statement of statements) {
+      try {
+        await db.query(statement);
+      } catch (e) {
+        console.error(`[DB] Error executing schema statement:`, e);
+      }
+    }
+
     // Migrations for PostgreSQL
-    try { await db.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT;"); } catch (e) {}
-    try { await db.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT;"); } catch (e) {}
-    try { await db.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;"); } catch (e) {}
-    try { await db.query("ALTER TABLE channels ADD COLUMN IF NOT EXISTS server_id TEXT;"); } catch (e) {}
-    try { await db.query("ALTER TABLE channels ADD COLUMN IF NOT EXISTS locked BOOLEAN DEFAULT false;"); } catch (e) {}
-    try { await db.query("ALTER TABLE channels ADD COLUMN IF NOT EXISTS lock_message TEXT DEFAULT 'Ce salon est verrouillé.';"); } catch (e) {}
+    const migrations = [
+      { sql: "ALTER TABLE users ADD COLUMN display_name TEXT;", code: "42701" },
+      { sql: "ALTER TABLE users ADD COLUMN avatar TEXT;", code: "42701" },
+      { sql: "ALTER TABLE users ADD COLUMN bio TEXT;", code: "42701" },
+      { sql: "ALTER TABLE channels ADD COLUMN server_id TEXT;", code: "42701" },
+      { sql: "ALTER TABLE channels ADD COLUMN locked BOOLEAN DEFAULT false;", code: "42701" },
+      { sql: "ALTER TABLE channels ADD COLUMN lock_message TEXT DEFAULT 'Ce salon est verrouillé.';", code: "42701" }
+    ];
+
+    for (const migration of migrations) {
+      try {
+        await db.query(migration.sql);
+      } catch (e: any) {
+        // 42701 is "duplicate_column" in Postgres
+        if (e.code !== migration.code) {
+          console.error(`[DB] Migration error (${migration.sql}):`, e);
+        }
+      }
+    }
   } else {
     db.exec(schema.replace(/SERIAL PRIMARY KEY/g, 'INTEGER PRIMARY KEY AUTOINCREMENT'));
     // Migrations for SQLite
-    try { db.exec("ALTER TABLE channels ADD COLUMN server_id TEXT;"); } catch (e) {}
-    try { db.exec("ALTER TABLE channels ADD COLUMN locked BOOLEAN DEFAULT 0;"); } catch (e) {}
-    try { db.exec("ALTER TABLE channels ADD COLUMN lock_message TEXT DEFAULT 'Ce salon est verrouillé.';"); } catch (e) {}
-    try { db.exec("ALTER TABLE users ADD COLUMN display_name TEXT;"); } catch (e) {}
-    try { db.exec("ALTER TABLE users ADD COLUMN avatar TEXT;"); } catch (e) {}
-    try { db.exec("ALTER TABLE users ADD COLUMN bio TEXT;"); } catch (e) {}
+    const sqliteMigrations = [
+      "ALTER TABLE channels ADD COLUMN server_id TEXT;",
+      "ALTER TABLE channels ADD COLUMN locked BOOLEAN DEFAULT 0;",
+      "ALTER TABLE channels ADD COLUMN lock_message TEXT DEFAULT 'Ce salon est verrouillé.';",
+      "ALTER TABLE users ADD COLUMN display_name TEXT;",
+      "ALTER TABLE users ADD COLUMN avatar TEXT;",
+      "ALTER TABLE users ADD COLUMN bio TEXT;"
+    ];
+
+    for (const sql of sqliteMigrations) {
+      try {
+        db.exec(sql);
+      } catch (e) {
+        // Ignore "duplicate column name" errors in SQLite
+      }
+    }
   }
 
   await execute("INSERT INTO servers (id, name, owner, timestamp) VALUES ('fitcord-global', 'FitCord Global', 'system', '2026-02-27T00:00:00.000Z') ON CONFLICT DO NOTHING");
