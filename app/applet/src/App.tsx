@@ -19,23 +19,20 @@ export default function App() {
       >
         {/* Logo Container */}
         <div className="relative mb-8">
-          <div className="w-24 h-24 rounded-3xl bg-[#7c5dfa] flex items-center justify-center overflow-hidden shadow-[0_0_20px_rgba(124,93,250,0.4)] border border-white/10">
+          <div 
+            className="w-24 h-24 rounded-3xl bg-[#7c5dfa] flex items-center justify-center overflow-hidden shadow-[0_0_20px_rgba(124,93,250,0.4)] border border-white/10 relative"
+          >
+            {/* Fallback text that is always there behind the image */}
+            <span className="absolute text-white font-bold text-3xl tracking-tighter opacity-20">FC</span>
+            
             <img 
-              src="https://m.media-amazon.com/images/M/MV5BNDg4NjM1OTY5NF5BMl5BanBnXkFtZTcwMDMyMzQyMQ@@._V1_.jpg" 
-              alt="FitCord Logo" 
-              className="w-full h-full object-cover"
+              src="https://m.media-amazon.com/images/M/MV5BNDg4NjM1OTY5NF5BMl5BanBnXkFtZTcwMDMyMzQyMQ@@._V1_FMjpg_UX1000_.jpg" 
+              alt="" // Empty alt to prevent broken text from showing
+              className="w-full h-full object-cover relative z-10"
               referrerPolicy="no-referrer"
               onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                // Show a fallback icon or text if image fails
-                const parent = target.parentElement;
-                if (parent && !parent.querySelector('.fallback')) {
-                  const fallback = document.createElement('div');
-                  fallback.className = 'fallback text-white font-bold text-2xl';
-                  fallback.innerText = 'FC';
-                  parent.appendChild(fallback);
-                }
+                // If the image fails, we just hide it to show the "FC" fallback
+                (e.target as HTMLImageElement).style.opacity = '0';
               }}
             />
           </div>
