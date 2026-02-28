@@ -20,21 +20,16 @@ export default function App() {
         {/* Logo Container */}
         <div className="relative mb-8">
           <div 
-            className="w-24 h-24 rounded-3xl bg-[#7c5dfa] flex items-center justify-center overflow-hidden shadow-[0_0_20px_rgba(124,93,250,0.4)] border border-white/10 relative"
+            className="w-24 h-24 rounded-3xl bg-[#7c5dfa] flex items-center justify-center shadow-[0_0_30px_rgba(124,93,250,0.6)] border-2 border-white/20 relative overflow-hidden"
           >
-            {/* Fallback text that is always there behind the image */}
-            <span className="absolute text-white font-bold text-3xl tracking-tighter opacity-20">FC</span>
+            {/* Decorative background elements */}
+            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/10 to-transparent"></div>
             
-            <img 
-              src="https://m.media-amazon.com/images/M/MV5BNDg4NjM1OTY5NF5BMl5BanBnXkFtZTcwMDMyMzQyMQ@@._V1_FMjpg_UX1000_.jpg" 
-              alt="" // Empty alt to prevent broken text from showing
-              className="w-full h-full object-cover relative z-10"
-              referrerPolicy="no-referrer"
-              onError={(e) => {
-                // If the image fails, we just hide it to show the "FC" fallback
-                (e.target as HTMLImageElement).style.opacity = '0';
-              }}
-            />
+            {/* Stylized Text Logo */}
+            <span className="text-white font-black text-4xl tracking-tighter drop-shadow-md">FC</span>
+            
+            {/* Subtle glow effect */}
+            <div className="absolute -bottom-4 -right-4 w-12 h-12 bg-white/20 rounded-full blur-xl"></div>
           </div>
         </div>
 
