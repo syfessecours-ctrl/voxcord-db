@@ -2,32 +2,28 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Playfair Display", serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 @layer base {
   body {
-    @apply bg-[#fdfaf6] text-[#2c1810] font-sans;
+    @apply bg-[#1e1e24] text-white font-sans;
   }
 }
 
-.amelie-red {
-  color: #c41e3a;
+.fitcord-card {
+  background-color: #2b2b36;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 
-.amelie-bg-red {
-  background-color: #c41e3a;
+.fitcord-input {
+  background-color: #1e1e24;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.amelie-green {
-  color: #2e4d32;
+.fitcord-purple {
+  background-color: #7c5dfa;
 }
 
-.amelie-bg-green {
-  background-color: #2e4d32;
-}
-
-.parisian-shadow {
-  box-shadow: 0 4px 20px rgba(44, 24, 16, 0.08);
+.fitcord-purple-glow {
+  box-shadow: 0 4px 15px rgba(124, 93, 250, 0.3);
 }
