@@ -20,6 +20,8 @@ export interface FriendRequest {
 export interface Friend {
   username: string;
   status: 'online' | 'offline' | 'away';
+  displayName?: string;
+  avatar?: string;
 }
 
 export interface PrivateMessage {
@@ -42,6 +44,8 @@ export interface Channel {
   name: string;
   type: string;
   server_id: string;
+  locked?: boolean;
+  lock_message?: string;
 }
 
 export interface Message {

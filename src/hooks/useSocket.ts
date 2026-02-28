@@ -12,6 +12,7 @@ export function useSocket(username: string) {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [privateMessages, setPrivateMessages] = useState<Record<string, PrivateMessage[]>>({});
+  const [serverMembers, setServerMembers] = useState<string[]>([]);
   const [activeServer, setActiveServer] = useState<string | null>(null);
   const [activeChannel, setActiveChannel] = useState('general');
   const [activePrivateChat, setActivePrivateChat] = useState<string | null>(null);
@@ -65,8 +66,17 @@ export function useSocket(username: string) {
     newSocket.on('friend_list', (list) => setFriends(list));
     newSocket.on('friend_requests', (list) => setFriendRequests(list));
 
+    newSocket.on('server_members', ({ serverId, members }) => {
+      setServerMembers(members);
+    });
+
     newSocket.on('friend_status_update', ({ username, status }) => {
       setFriends(prev => prev.map(f => f.username === username ? { ...f, status } : f));
+    });
+
+    newSocket.on('user_profile_updated', ({ username, displayName, avatar, bio }) => {
+      setFriends(prev => prev.map(f => f.username === username ? { ...f, displayName, avatar } : f));
+      setUsers(prev => prev.map(u => u.username === username ? { ...u, displayName, avatar, bio } : u));
     });
 
     newSocket.on('new_friend_request', (request) => {
@@ -126,6 +136,26 @@ export function useSocket(username: string) {
     newSocket.on('voice_signal', (data) => {
       // This will be handled by ChatInterface via an event listener or a ref
       window.dispatchEvent(new CustomEvent('vox_voice_signal', { detail: data }));
+    });
+
+    newSocket.on('channel_updated', (updatedChannel) => {
+      setChannels(prev => prev.map(c => c.id === updatedChannel.id ? updatedChannel : c));
+    });
+
+    newSocket.on('server_deleted', (serverId) => {
+      setServers(prev => prev.filter(s => s.id !== serverId));
+      if (activeServer === serverId) {
+        setActiveServer('voxcord-global');
+        newSocket.emit('get_server_channels', 'voxcord-global');
+      }
+    });
+
+    newSocket.on('channel_deleted', (channelId) => {
+      setChannels(prev => prev.filter(c => c.id !== channelId));
+      if (activeChannel === channelId) {
+        setActiveChannel('general');
+        newSocket.emit('switch_channel', 'general');
+      }
     });
 
     return newSocket;
@@ -202,6 +232,26 @@ export function useSocket(username: string) {
     socketRef.current?.emit('mod_clear_channel', channelId);
   };
 
+  const deleteServer = (serverId: string) => {
+    socketRef.current?.emit('mod_delete_server', serverId);
+  };
+
+  const deleteChannel = (channelId: string) => {
+    socketRef.current?.emit('mod_delete_channel', channelId);
+  };
+
+  const joinServer = (serverId: string) => {
+    socketRef.current?.emit('mod_join_server', serverId);
+  };
+
+  const lockChannel = (channelId: string, lockMessage: string) => {
+    socketRef.current?.emit('lock_channel', { channelId, lockMessage });
+  };
+
+  const unlockChannel = (channelId: string) => {
+    socketRef.current?.emit('unlock_channel', channelId);
+  };
+
   const setRole = (targetUsername: string, role: string) => {
     socketRef.current?.emit('mod_set_role', { targetUsername, role });
   };
@@ -254,6 +304,7 @@ export function useSocket(username: string) {
     friends,
     friendRequests,
     privateMessages,
+    serverMembers,
     activeServer,
     activeChannel,
     activePrivateChat,
@@ -276,6 +327,11 @@ export function useSocket(username: string) {
     banUser,
     deleteMessage,
     clearChannel,
+    deleteServer,
+    deleteChannel,
+    joinServer,
+    lockChannel,
+    unlockChannel,
     setRole,
     switchChannel,
     joinVoice,

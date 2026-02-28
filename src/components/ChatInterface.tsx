@@ -17,6 +17,8 @@ import {
   UserPlus,
   Check,
   X,
+  Lock,
+  Unlock,
   MessageSquare,
   ArrowLeft,
   Volume2,
@@ -37,6 +39,7 @@ interface ChatInterfaceProps {
   friends: Friend[];
   friendRequests: FriendRequest[];
   privateMessages: Record<string, PrivateMessage[]>;
+  serverMembers: string[];
   activeServer: string | null;
   activeChannel: string;
   activePrivateChat: string | null;
@@ -54,6 +57,11 @@ interface ChatInterfaceProps {
   onBanUser: (targetUsername: string, reason: string) => void;
   onDeleteMessage: (messageId: number) => void;
   onClearChannel: (channelId: string) => void;
+  onDeleteServer: (serverId: string) => void;
+  onDeleteChannel: (channelId: string) => void;
+  onJoinServer: (serverId: string) => void;
+  onLockChannel: (channelId: string, lockMessage: string) => void;
+  onUnlockChannel: (channelId: string) => void;
   onSetRole: (targetUsername: string, role: string) => void;
   onSendFriendRequest: (targetUsername: string) => void;
   onRespondFriendRequest: (requestId: number, response: 'accepted' | 'rejected') => void;
@@ -74,6 +82,7 @@ export function ChatInterface({
   friends,
   friendRequests,
   privateMessages,
+  serverMembers,
   activeServer,
   activeChannel,
   activePrivateChat,
@@ -91,6 +100,11 @@ export function ChatInterface({
   onBanUser,
   onDeleteMessage,
   onClearChannel,
+  onDeleteServer,
+  onDeleteChannel,
+  onJoinServer,
+  onLockChannel,
+  onUnlockChannel,
   onSetRole,
   onSendFriendRequest,
   onRespondFriendRequest,
@@ -112,6 +126,8 @@ export function ChatInterface({
   const [showCreateServerModal, setShowCreateServerModal] = useState(false);
   const [newServerName, setNewServerName] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showLockModal, setShowLockModal] = useState(false);
+  const [lockMessage, setLockMessage] = useState('Seul les modérateurs peuvent écrire ici');
   const [inviteTarget, setInviteTarget] = useState('');
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
@@ -194,6 +210,23 @@ export function ChatInterface({
     if (confirm("Voulez-vous vraiment effacer tout le salon ?")) {
       onClearChannel(activeChannel);
     }
+  };
+
+  const handleDeleteServer = (serverId: string) => {
+    if (confirm("Voulez-vous vraiment supprimer ce serveur ? Cette action est irréversible.")) {
+      onDeleteServer(serverId);
+    }
+  };
+
+  const handleDeleteChannel = (channelId: string) => {
+    if (confirm("Voulez-vous vraiment supprimer ce salon ?")) {
+      onDeleteChannel(channelId);
+    }
+  };
+
+  const handleLock = () => {
+    onLockChannel(activeChannel, lockMessage);
+    setShowLockModal(false);
   };
 
   useEffect(() => {
@@ -395,6 +428,18 @@ export function ChatInterface({
               {activeServer === srv.id && (
                 <div className="absolute -left-2 w-1 h-8 bg-vox-primary rounded-r-full" />
               )}
+              
+              {isOwner && srv.id !== 'voxcord-global' && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteServer(srv.id);
+                  }}
+                  className="absolute -right-1 -top-1 w-5 h-5 bg-vox-accent text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:scale-110 z-50 shadow-lg"
+                >
+                  <X size={10} />
+                </button>
+              )}
             </div>
           ))}
           
@@ -416,6 +461,14 @@ export function ChatInterface({
           <span className="font-black text-lg tracking-tighter text-vox-text truncate">
             {activeServer ? currentServer?.name : "Messages Directs"}
           </span>
+          {activeServer && isOwner && !serverMembers.includes(username) && (
+            <button 
+              onClick={() => onJoinServer(activeServer)}
+              className="ml-auto bg-vox-primary text-white text-[10px] px-3 py-1.5 rounded-xl font-black uppercase tracking-widest hover:bg-vox-primary-hover transition-all"
+            >
+              Rejoindre
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-6 discord-scrollbar">
@@ -493,7 +546,7 @@ export function ChatInterface({
               <div className="px-3 mb-2 text-[9px] font-black text-vox-muted uppercase tracking-[0.2em]">Salons</div>
               <div className="space-y-0.5">
                 {channels.map(ch => (
-                  <div key={ch.id}>
+                  <div key={ch.id} className="group relative">
                     <div 
                       onClick={() => {
                         setShowFriendsView(false);
@@ -505,8 +558,21 @@ export function ChatInterface({
                       )}
                     >
                       {ch.type === 'voice' ? <Volume2 size={18} /> : <Hash size={18} />}
-                      <span className="truncate">{ch.name}</span>
+                      <span className="truncate flex-1">{ch.name}</span>
+                      {ch.locked && <Lock size={12} className="text-amber-500" />}
                     </div>
+                    
+                    {isOwner && ch.id !== 'general' && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteChannel(ch.id);
+                        }}
+                        className="absolute right-2 top-2 p-1 text-vox-muted hover:text-vox-accent opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                     
                     {ch.type === 'voice' && voiceStates[ch.id] && voiceStates[ch.id].length > 0 && (
                       <div className="ml-9 mt-1 mb-2 space-y-1">
@@ -683,7 +749,7 @@ export function ChatInterface({
                             )} />
                           </div>
                           <div>
-                            <div className="text-sm font-black text-vox-text">{f.username}</div>
+                            <div className="text-sm font-black text-vox-text">{f.displayName || f.username}</div>
                             <div className="text-[10px] font-bold text-vox-muted uppercase tracking-widest">{f.status}</div>
                           </div>
                         </div>
@@ -720,7 +786,9 @@ export function ChatInterface({
                         )} />
                       </div>
                       <div className="flex flex-col">
-                        <span className="font-black text-vox-text tracking-tight">{activePrivateChat}</span>
+                        <span className="font-black text-vox-text tracking-tight">
+                          {friends.find(f => f.username === activePrivateChat)?.displayName || activePrivateChat}
+                        </span>
                         <span className="text-[9px] font-bold text-vox-muted uppercase tracking-widest">Message Direct</span>
                       </div>
                     </>
@@ -739,15 +807,34 @@ export function ChatInterface({
                 
                 <div className="flex items-center gap-2">
                   {!activePrivateChat && isOwner && (
-                    <button 
-                      onClick={handleClear}
-                      className="p-2.5 text-vox-muted hover:text-vox-accent hover:bg-vox-accent/5 rounded-xl transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
-                    >
-                      <Eraser size={18} />
-                      <span className="hidden sm:inline">Vider</span>
-                    </button>
+                    <>
+                      {currentChannel?.locked ? (
+                        <button 
+                          onClick={() => onUnlockChannel(activeChannel)}
+                          className="p-2.5 text-emerald-500 hover:bg-emerald-500/5 rounded-xl transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                        >
+                          <Unlock size={18} />
+                          <span className="hidden lg:inline">Déverrouiller</span>
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => setShowLockModal(true)}
+                          className="p-2.5 text-amber-500 hover:bg-amber-500/5 rounded-xl transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                        >
+                          <Lock size={18} />
+                          <span className="hidden lg:inline">Verrouiller</span>
+                        </button>
+                      )}
+                      <button 
+                        onClick={handleClear}
+                        className="p-2.5 text-vox-muted hover:text-vox-accent hover:bg-vox-accent/5 rounded-xl transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                      >
+                        <Eraser size={18} />
+                        <span className="hidden lg:inline">Vider</span>
+                      </button>
+                    </>
                   )}
-                  {activeServer && currentServer?.owner === username && (
+                  {activeServer && (currentServer?.owner === username || isOwner) && (
                     <button 
                       onClick={() => setShowInviteModal(true)}
                       className="p-2.5 text-vox-primary hover:bg-vox-primary/5 rounded-xl transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
@@ -857,8 +944,13 @@ export function ChatInterface({
                       type="text"
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
-                      placeholder={activePrivateChat ? `Message à @${activePrivateChat}` : `Message dans #${currentChannel?.name}`}
-                      className="flex-1 bg-transparent border-none outline-none text-vox-text py-3 px-2 text-sm font-bold placeholder:text-vox-muted/50"
+                      disabled={currentChannel?.locked && !isOwner && me?.role !== 'moderator'}
+                      placeholder={
+                        currentChannel?.locked && !isOwner && me?.role !== 'moderator' 
+                          ? (currentChannel.lock_message || "Ce salon est verrouillé.") 
+                          : (activePrivateChat ? `Message à @${activePrivateChat}` : `Message dans #${currentChannel?.name}`)
+                      }
+                      className="flex-1 bg-transparent border-none outline-none text-vox-text py-3 px-2 text-sm font-bold placeholder:text-vox-muted/50 disabled:opacity-50"
                     />
                     <div className="flex items-center gap-1">
                       <button type="button" className="w-12 h-12 flex items-center justify-center text-vox-muted hover:text-vox-primary hover:bg-vox-primary/5 rounded-full transition-all">
@@ -1318,6 +1410,68 @@ export function ChatInterface({
                     className="flex-1 py-5 px-4 bg-vox-primary text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-vox-primary-hover hover:-translate-y-1 active:translate-y-0 shadow-xl shadow-vox-primary/20 transition-all disabled:opacity-50 disabled:hover:translate-y-0"
                   >
                     Envoyer
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Lock Channel Modal */}
+      <AnimatePresence>
+        {showLockModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowLockModal(false)}
+              className="absolute inset-0 bg-vox-bg/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-md bg-vox-surface border border-vox-border rounded-[3rem] p-8 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-500">
+                    <Lock size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-vox-text tracking-tight">Verrouiller le salon</h2>
+                    <p className="text-xs font-bold text-vox-muted uppercase tracking-widest">#{currentChannel?.name}</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowLockModal(false)} className="p-2 text-vox-muted hover:text-vox-text transition-all">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-[10px] font-black text-vox-muted uppercase tracking-[0.2em] mb-3">Message de verrouillage</label>
+                  <textarea 
+                    value={lockMessage}
+                    onChange={(e) => setLockMessage(e.target.value)}
+                    className="w-full bg-vox-bg border border-vox-border rounded-2xl p-4 text-sm font-bold text-vox-text focus:border-vox-primary outline-none transition-all min-h-[100px] resize-none"
+                    placeholder="Ex: Seul les modérateurs peuvent écrire ici..."
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    onClick={() => setShowLockModal(false)}
+                    className="flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-vox-muted hover:bg-vox-surface transition-all"
+                  >
+                    Annuler
+                  </button>
+                  <button 
+                    onClick={handleLock}
+                    className="flex-1 py-4 bg-amber-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-amber-600 transition-all shadow-lg shadow-amber-500/20"
+                  >
+                    Verrouiller
                   </button>
                 </div>
               </div>

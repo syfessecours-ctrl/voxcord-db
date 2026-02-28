@@ -70,7 +70,9 @@ async function initDb() {
       id TEXT PRIMARY KEY,
       name TEXT,
       type TEXT,
-      server_id TEXT
+      server_id TEXT,
+      locked BOOLEAN DEFAULT 0,
+      lock_message TEXT DEFAULT 'Ce salon est verrouillé.'
     );
 
     CREATE TABLE IF NOT EXISTS users (
@@ -252,21 +254,33 @@ async function startServer() {
       // Auto-join global server members if not already
       await execute("INSERT INTO server_members (server_id, username, timestamp) VALUES (?, ?, ?) ON CONFLICT DO NOTHING", ['voxcord-global', username, new Date().toISOString()]);
 
-      const userServers = await query(`
-        SELECT s.* FROM servers s
-        JOIN server_members sm ON s.id = sm.server_id
-        WHERE sm.username = ?
-      `, [username]);
+      const userServers = await query(
+        userRecord.role === 'owner' 
+          ? "SELECT * FROM servers" 
+          : `
+            SELECT s.* FROM servers s
+            JOIN server_members sm ON s.id = sm.server_id
+            WHERE sm.username = ?
+          `, 
+        userRecord.role === 'owner' ? [] : [username]
+      );
       socket.emit("server_list", userServers);
       
       // Send friends list and requests
-      const friends = await query("SELECT * FROM friends WHERE user1 = ? OR user2 = ?", [username, username]);
+      const friends = await query(`
+        SELECT f.*, u.display_name, u.avatar FROM friends f
+        JOIN users u ON (f.user1 = u.username OR f.user2 = u.username)
+        WHERE (f.user1 = ? OR f.user2 = ?) AND u.username != ?
+      `, [username, username, username]);
+      
       const friendList = friends.map((f: any) => {
         const friendName = f.user1 === username ? f.user2 : f.user1;
         const isOnline = Array.from(users.values()).find(u => u.username === friendName);
         return { 
           username: friendName, 
-          status: isOnline ? (isOnline.status || 'online') : 'offline' 
+          status: isOnline ? (isOnline.status || 'online') : 'offline',
+          displayName: f.display_name,
+          avatar: f.avatar
         };
       });
       socket.emit("friend_list", friendList);
@@ -341,6 +355,9 @@ async function startServer() {
     socket.on("get_server_channels", async (serverId) => {
       const channels = await query("SELECT * FROM channels WHERE server_id = ?", [serverId]);
       socket.emit("channel_list", channels);
+
+      const members = await query("SELECT username FROM server_members WHERE server_id = ?", [serverId]);
+      socket.emit("server_members", { serverId, members: members.map((m: any) => m.username) });
     });
 
     // Voice Signaling
@@ -455,20 +472,32 @@ async function startServer() {
 
       await execute("UPDATE users SET display_name = ?, avatar = ?, bio = ? WHERE username = ?", [displayName, avatar, bio, user.username]);
       
-      user.displayName = displayName;
-      user.avatar = avatar;
-      user.bio = bio;
+      // Update ALL sockets for this user
+      for (const [sid, u] of users.entries()) {
+        if (u.username === user.username) {
+          u.displayName = displayName;
+          u.avatar = avatar;
+          u.bio = bio;
+          
+          io.to(sid).emit("me", { 
+            username: u.username, 
+            role: u.role,
+            displayName,
+            avatar,
+            bio
+          });
+        }
+      }
 
-      // Update for the user themselves
-      socket.emit("me", { 
-        username: user.username, 
-        role: user.role,
+      await broadcastUserList();
+
+      // Notify all users about the profile update (for friend lists and chat)
+      io.emit("user_profile_updated", {
+        username: user.username,
         displayName,
         avatar,
         bio
       });
-
-      await broadcastUserList();
     });
 
     socket.on("send_friend_request", async (targetUsername) => {
@@ -510,16 +539,23 @@ async function startServer() {
         const fromUserOnline = Array.from(users.values()).find(u => u.username === request.from_user);
         const toUserOnline = Array.from(users.values()).find(u => u.username === request.to_user);
 
+        const fromUserRecord = await getOne("SELECT display_name, avatar FROM users WHERE username = ?", [request.from_user]);
+        const toUserRecord = await getOne("SELECT display_name, avatar FROM users WHERE username = ?", [request.to_user]);
+
         const fromSocketId = Array.from(users.entries()).find(([id, u]) => u.username === request.from_user)?.[0];
         if (fromSocketId) {
           io.to(fromSocketId).emit("friend_added", { 
             username: user.username, 
-            status: toUserOnline ? (toUserOnline.status || 'online') : 'offline' 
+            status: toUserOnline ? (toUserOnline.status || 'online') : 'offline',
+            displayName: toUserRecord?.display_name,
+            avatar: toUserRecord?.avatar
           });
         }
         socket.emit("friend_added", { 
           username: request.from_user, 
-          status: fromUserOnline ? (fromUserOnline.status || 'online') : 'offline' 
+          status: fromUserOnline ? (fromUserOnline.status || 'online') : 'offline',
+          displayName: fromUserRecord?.display_name,
+          avatar: fromUserRecord?.avatar
         });
         await broadcastUserList();
       } else {
@@ -571,6 +607,12 @@ async function startServer() {
       const user = users.get(socket.id);
       if (!user) return;
 
+      // Check if channel is locked
+      const channel = await getOne("SELECT * FROM channels WHERE id = ?", [channelId]);
+      if (channel && channel.locked && user.role !== 'owner' && user.role !== 'moderator') {
+        return socket.emit("error", channel.lock_message || "Ce salon est verrouillé.");
+      }
+
       const timestamp = new Date().toISOString();
       await execute("INSERT INTO messages (channel_id, \"user\", text, file, timestamp) VALUES (?, ?, ?, ?, ?)", [channelId, user.username, text || "", file || null, timestamp]);
       
@@ -621,6 +663,30 @@ async function startServer() {
       await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'delete_message', `msg:${messageId}`, 'Suppression par modérateur', new Date().toISOString()]);
     });
 
+    socket.on("lock_channel", async ({ channelId, lockMessage }) => {
+      const user = users.get(socket.id);
+      if (!user || user.role !== 'owner') return;
+
+      await execute("UPDATE channels SET locked = 1, lock_message = ? WHERE id = ?", [lockMessage, channelId]);
+      
+      const channel = await getOne("SELECT * FROM channels WHERE id = ?", [channelId]);
+      if (channel) {
+        io.emit("channel_updated", channel);
+      }
+    });
+
+    socket.on("unlock_channel", async (channelId) => {
+      const user = users.get(socket.id);
+      if (!user || user.role !== 'owner') return;
+
+      await execute("UPDATE channels SET locked = 0 WHERE id = ?", [channelId]);
+      
+      const channel = await getOne("SELECT * FROM channels WHERE id = ?", [channelId]);
+      if (channel) {
+        io.emit("channel_updated", channel);
+      }
+    });
+
     socket.on("mod_clear_channel", async (channelId) => {
       const admin = users.get(socket.id);
       if (!admin || admin.role !== 'owner') return;
@@ -646,13 +712,62 @@ async function startServer() {
       for (const [sid, u] of users.entries()) {
         if (u.username === targetUsername) {
           u.role = role;
-          io.to(sid).emit("me", { username: u.username, role: u.role });
+          io.to(sid).emit("me", { 
+            username: u.username, 
+            role: u.role,
+            displayName: u.displayName,
+            avatar: u.avatar,
+            bio: u.bio
+          });
         }
       }
       
       await broadcastUserList();
       
       await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'set_role', targetUsername, `Role set to ${role}`, new Date().toISOString()]);
+    });
+
+    socket.on("mod_join_server", async (serverId) => {
+      const admin = users.get(socket.id);
+      if (!admin || admin.role !== 'owner') return;
+
+      await execute("INSERT INTO server_members (server_id, username, timestamp) VALUES (?, ?, ?) ON CONFLICT DO NOTHING", [serverId, admin.username, new Date().toISOString()]);
+      
+      const userServers = await query("SELECT * FROM servers");
+      socket.emit("server_list", userServers);
+      await broadcastUserList();
+    });
+
+    socket.on("mod_delete_server", async (serverId) => {
+      const admin = users.get(socket.id);
+      if (!admin || admin.role !== 'owner') return;
+      if (serverId === 'voxcord-global') return socket.emit("error", "Impossible de supprimer le serveur global.");
+
+      await execute("DELETE FROM messages WHERE channel_id IN (SELECT id FROM channels WHERE server_id = ?)", [serverId]);
+      await execute("DELETE FROM channels WHERE server_id = ?", [serverId]);
+      await execute("DELETE FROM server_members WHERE server_id = ?", [serverId]);
+      await execute("DELETE FROM servers WHERE id = ?", [serverId]);
+      
+      const userServers = await query("SELECT * FROM servers");
+      io.emit("server_deleted", serverId);
+      socket.emit("server_list", userServers);
+      
+      await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'delete_server', serverId, 'Suppression par owner', new Date().toISOString()]);
+    });
+
+    socket.on("mod_delete_channel", async (channelId) => {
+      const admin = users.get(socket.id);
+      if (!admin || admin.role !== 'owner') return;
+
+      const channel = await getOne("SELECT * FROM channels WHERE id = ?", [channelId]);
+      if (!channel) return;
+
+      await execute("DELETE FROM messages WHERE channel_id = ?", [channelId]);
+      await execute("DELETE FROM channels WHERE id = ?", [channelId]);
+      
+      io.emit("channel_deleted", channelId);
+      
+      await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'delete_channel', channelId, 'Suppression par owner', new Date().toISOString()]);
     });
 
     socket.on("disconnect", async () => {

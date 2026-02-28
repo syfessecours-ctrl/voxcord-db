@@ -14,6 +14,7 @@ export default function App() {
     friends,
     friendRequests,
     privateMessages,
+    serverMembers,
     activeServer,
     activeChannel,
     activePrivateChat,
@@ -36,6 +37,11 @@ export default function App() {
     banUser,
     deleteMessage,
     clearChannel,
+    deleteServer,
+    deleteChannel,
+    joinServer,
+    lockChannel,
+    unlockChannel,
     setRole,
     switchChannel,
     joinVoice,
@@ -69,6 +75,7 @@ export default function App() {
       friends={friends}
       friendRequests={friendRequests}
       privateMessages={privateMessages}
+      serverMembers={serverMembers}
       activeServer={activeServer}
       activeChannel={activeChannel}
       activePrivateChat={activePrivateChat}
@@ -86,6 +93,11 @@ export default function App() {
       onBanUser={banUser}
       onDeleteMessage={deleteMessage}
       onClearChannel={clearChannel}
+      onDeleteServer={deleteServer}
+      onDeleteChannel={deleteChannel}
+      onJoinServer={joinServer}
+      onLockChannel={lockChannel}
+      onUnlockChannel={unlockChannel}
       onSetRole={setRole}
       onSendFriendRequest={sendFriendRequest}
       onRespondFriendRequest={respondFriendRequest}
