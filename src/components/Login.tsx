@@ -39,7 +39,7 @@ export function Login({ onLogin, error, initialUsername }: LoginProps) {
               type="text" 
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-slate-50 border border-vox-border rounded-2xl p-4 text-vox-text outline-none focus:ring-2 focus:ring-vox-primary/20 focus:border-vox-primary transition-all"
+              className="w-full bg-vox-bg border border-vox-border rounded-2xl p-4 text-vox-text outline-none focus:ring-4 focus:ring-vox-primary/5 focus:border-vox-primary transition-all"
               placeholder="Ex: Jean Dupont"
             />
           </div>
@@ -49,14 +49,14 @@ export function Login({ onLogin, error, initialUsername }: LoginProps) {
               type="password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-50 border border-vox-border rounded-2xl p-4 text-vox-text outline-none focus:ring-2 focus:ring-vox-primary/20 focus:border-vox-primary transition-all"
+              className="w-full bg-vox-bg border border-vox-border rounded-2xl p-4 text-vox-text outline-none focus:ring-4 focus:ring-vox-primary/5 focus:border-vox-primary transition-all"
               placeholder="••••••••"
             />
           </div>
-          {error && <p className="text-red-500 text-xs font-medium text-center">{error}</p>}
+          {error && <p className="text-vox-accent text-xs font-bold text-center uppercase tracking-widest">{error}</p>}
           <button 
             type="submit"
-            className="w-full bg-vox-primary text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-100 hover:bg-vox-primary-hover hover:-translate-y-0.5 active:translate-y-0 transition-all"
+            className="w-full bg-vox-primary text-white font-black text-xs tracking-widest py-5 rounded-2xl shadow-xl shadow-vox-primary/20 hover:bg-vox-primary-hover hover:-translate-y-1 active:translate-y-0 transition-all"
           >
             SE CONNECTER
           </button>
