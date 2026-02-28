@@ -175,10 +175,23 @@ async function startServer() {
       if (u.role === 'owner' || u.role === 'moderator') {
         io.to(sid).emit("user_list", allUsers);
       } else {
-        const friends = await query("SELECT * FROM friends WHERE user1 = ? OR user2 = ?", [u.username, u.username]);
-        const friendNames = new Set(friends.map((f: any) => f.user1 === u.username ? f.user2 : f.user1));
-        const filtered = allUsers.filter(user => user.username === u.username || friendNames.has(user.username));
-        io.to(sid).emit("user_list", filtered);
+        // Get all users who share at least one server with this user
+        const userServers = await query("SELECT server_id FROM server_members WHERE username = ?", [u.username]);
+        const serverIds = userServers.map((s: any) => s.server_id);
+        
+        if (serverIds.length > 0) {
+          const placeholders = serverIds.map(() => '?').join(',');
+          const serverMembers = await query(`
+            SELECT DISTINCT username FROM server_members 
+            WHERE server_id IN (${placeholders})
+          `, serverIds);
+          const memberNames = new Set(serverMembers.map((m: any) => m.username));
+          const filtered = allUsers.filter(user => memberNames.has(user.username));
+          io.to(sid).emit("user_list", filtered);
+        } else {
+          // Fallback to just themselves if not in any server (shouldn't happen as they join global)
+          io.to(sid).emit("user_list", allUsers.filter(user => user.username === u.username));
+        }
       }
     }
   };
@@ -311,6 +324,8 @@ async function startServer() {
       const user = users.get(socket.id);
       if (!user) return;
       
+      console.log(`[Voice] User ${user.username} joining voice channel: ${channelId}`);
+      
       // If user was in another voice channel, leave it first
       if (user.currentVoiceChannel && user.currentVoiceChannel !== channelId) {
         const oldChannelId = user.currentVoiceChannel;
@@ -325,6 +340,8 @@ async function startServer() {
       const others = Array.from(users.entries())
         .filter(([sid, u]) => u.currentVoiceChannel === channelId && sid !== socket.id)
         .map(([sid, u]) => ({ sid, username: u.username }));
+      
+      console.log(`[Voice] Found ${others.length} other users in channel ${channelId}`);
       
       socket.emit("voice_users", others);
       socket.to(`voice:${channelId}`).emit("user_joined_voice", { sid: socket.id, username: user.username });

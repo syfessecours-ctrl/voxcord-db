@@ -115,6 +115,12 @@ export function ChatInterface({
   const [myPeerId, setMyPeerId] = useState<string | null>(null);
   const signaledUsersRef = useRef<Set<string>>(new Set());
 
+  const voiceUsersRef = useRef(voiceUsers);
+
+  useEffect(() => {
+    voiceUsersRef.current = voiceUsers;
+  }, [voiceUsers]);
+
   const isOwner = me?.role === 'owner';
   const isMod = isOwner || me?.role === 'moderator';
 
@@ -163,35 +169,53 @@ export function ChatInterface({
 
   useEffect(() => {
     if (activeVoiceChannel) {
+      console.log("[Voice] Joining channel:", activeVoiceChannel);
       startVoiceChat();
     } else {
+      console.log("[Voice] Leaving channel");
       stopVoiceChat();
     }
     return () => stopVoiceChat();
   }, [activeVoiceChannel]);
 
+  // Signaling: When I have a Peer ID, tell everyone in the voice channel
   useEffect(() => {
     if (activeVoiceChannel && myPeerId) {
+      console.log("[Voice] Signaling my Peer ID to others:", voiceUsers.length - 1, "others");
       voiceUsers.forEach(vu => {
-        if (!signaledUsersRef.current.has(vu.sid) && vu.username !== username) {
+        if (vu.username !== username) {
           onSendVoiceSignal(vu.sid, { type: 'peer-id', peerId: myPeerId });
-          signaledUsersRef.current.add(vu.sid);
         }
       });
+    }
+  }, [myPeerId, activeVoiceChannel]); // Removed voiceUsers from deps to avoid spamming, but we might need it for new joiners
+
+  // Also signal to new joiners
+  useEffect(() => {
+    if (activeVoiceChannel && myPeerId) {
+      const lastUser = voiceUsers[voiceUsers.length - 1];
+      if (lastUser && lastUser.username !== username && !signaledUsersRef.current.has(lastUser.sid)) {
+        onSendVoiceSignal(lastUser.sid, { type: 'peer-id', peerId: myPeerId });
+        signaledUsersRef.current.add(lastUser.sid);
+      }
     }
   }, [voiceUsers, activeVoiceChannel, myPeerId]);
 
   useEffect(() => {
     const handleVoiceSignal = (e: any) => {
       const { from, signal, username: fromUser } = e.detail;
+      console.log(`[Voice] Received signal from ${fromUser}:`, signal.type);
+      
       if (peerRef.current && signal.type === 'peer-id') {
-        // Someone sent us their peer ID, call them if we are already in
         if (activeVoiceChannel && !callsRef.current[from]) {
+          console.log(`[Voice] Calling ${fromUser} at peer ${signal.peerId}`);
           const call = peerRef.current.call(signal.peerId, myStreamRef.current!);
           callsRef.current[from] = call;
           call.on('stream', (remoteStream) => {
+            console.log(`[Voice] Received stream from ${fromUser}`);
             addRemoteStream(from, remoteStream);
           });
+          call.on('error', (err) => console.error(`[Voice] Call error with ${fromUser}:`, err));
         }
       }
     };
@@ -205,7 +229,15 @@ export function ChatInterface({
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       myStreamRef.current = stream;
       
-      const peer = new Peer();
+      const peer = new Peer({
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+          ]
+        }
+      });
       peerRef.current = peer;
 
       peer.on('open', (id) => {
@@ -214,16 +246,21 @@ export function ChatInterface({
       });
 
       peer.on('call', (call) => {
-        call.answer(stream);
+        console.log('[Voice] Receiving call from:', call.peer);
+        call.answer(myStreamRef.current!);
         call.on('stream', (remoteStream) => {
-          // Find which user this is
-          const vu = voiceUsers.find(u => u.username === (call as any).peer); // This is a bit hacky with PeerJS auto IDs
+          console.log('[Voice] Received stream from caller:', call.peer);
           addRemoteStream(call.peer, remoteStream);
         });
       });
 
+      peer.on('error', (err) => {
+        console.error("[Voice] Peer error:", err);
+      });
+
     } catch (err) {
-      console.error("Failed to start voice chat", err);
+      console.error("[Voice] Failed to start voice chat:", err);
+      alert("Impossible d'accéder au micro. Vérifiez les permissions.");
     }
   };
 
@@ -264,10 +301,20 @@ export function ChatInterface({
     }
   };
 
+  const toggleMute = () => {
+    if (myStreamRef.current) {
+      const audioTrack = myStreamRef.current.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsMuted(!audioTrack.enabled);
+      }
+    }
+  };
+
   const currentServer = servers.find(s => s.id === activeServer);
   const currentChannel = channels.find(c => c.id === activeChannel);
 
-  const userOwnsServer = servers.some(s => s.owner === username);
+  const canCreateServer = !servers.some(s => s.owner === username) || me?.role === 'owner';
 
   return (
     <div className="flex h-screen bg-[#0a0a0c] text-gray-300 overflow-hidden font-sans w-full">
@@ -312,7 +359,7 @@ export function ChatInterface({
           </div>
         ))}
 
-        {!userOwnsServer && (
+        {canCreateServer && (
           <div 
             onClick={() => setShowCreateServerModal(true)}
             className="w-12 h-12 rounded-[24px] bg-[#111114] text-green-500 flex items-center justify-center transition-all cursor-pointer hover:bg-green-500 hover:text-white hover:rounded-[16px]"
@@ -416,7 +463,9 @@ export function ChatInterface({
                         {username[0].toUpperCase()}
                       </div>
                       <span className="text-xs font-bold text-white">{username}</span>
-                      <Mic size={12} className="ml-auto text-gray-500" />
+                      <button onClick={toggleMute} className="ml-auto text-gray-500 hover:text-white transition-all">
+                        {isMuted ? <MicOff size={12} className="text-red-500" /> : <Mic size={12} />}
+                      </button>
                     </div>
                     {voiceUsers.filter(vu => vu.username !== username).map(vu => (
                       <div key={vu.sid} className="flex items-center gap-2">
@@ -424,6 +473,7 @@ export function ChatInterface({
                           {vu.username[0].toUpperCase()}
                         </div>
                         <span className="text-xs font-bold">{vu.username}</span>
+                        <Volume2 size={12} className="ml-auto text-gray-500" />
                       </div>
                     ))}
                   </div>

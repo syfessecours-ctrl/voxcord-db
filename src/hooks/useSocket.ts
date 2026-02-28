@@ -112,9 +112,21 @@ export function useSocket(username: string) {
       }
     });
 
-    newSocket.on('voice_users', (users) => setVoiceUsers(users));
-    newSocket.on('user_joined_voice', (user) => setVoiceUsers(prev => [...prev, user]));
-    newSocket.on('user_left_voice', (sid) => setVoiceUsers(prev => prev.filter(u => u.sid !== sid)));
+    newSocket.on('voice_users', (users) => {
+      console.log("[Socket] Received voice_users:", users);
+      setVoiceUsers(users);
+    });
+    newSocket.on('user_joined_voice', (user) => {
+      console.log("[Socket] User joined voice:", user);
+      setVoiceUsers(prev => {
+        if (prev.find(u => u.sid === user.sid)) return prev;
+        return [...prev, user];
+      });
+    });
+    newSocket.on('user_left_voice', (sid) => {
+      console.log("[Socket] User left voice:", sid);
+      setVoiceUsers(prev => prev.filter(u => u.sid !== sid));
+    });
 
     newSocket.on('voice_signal', (data) => {
       // This will be handled by ChatInterface via an event listener or a ref
