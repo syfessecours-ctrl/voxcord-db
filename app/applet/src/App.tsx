@@ -78,8 +78,8 @@ export default function App() {
         >
           <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-[#c41e3a] overflow-hidden parisian-shadow">
             <img 
-              src="https://picsum.photos/seed/amelie/400/400" 
-              alt="Amélie" 
+              src="https://m.media-amazon.com/images/M/MV5BNDg4NjM1OTY5NF5BMl5BanBnXkFtZTcwMDMyMzQyMQ@@._V1_.jpg" 
+              alt="Amélie Poulain" 
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
             />
