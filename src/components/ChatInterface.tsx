@@ -23,7 +23,6 @@ import {
   Mic,
   MicOff,
   PhoneOff,
-  Server as ServerIcon,
   Settings
 } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -105,7 +104,6 @@ export function ChatInterface({
   const [inputText, setInputText] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showFriendsView, setShowFriendsView] = useState(true);
-  const [currentTab, setCurrentTab] = useState<'home' | 'explore' | 'settings'>('home');
   const [friendSearch, setFriendSearch] = useState('');
   const [isMuted, setIsMuted] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -354,264 +352,246 @@ export function ChatInterface({
   const canCreateServer = !servers.some(s => s.owner === username) || me?.role === 'owner';
 
   return (
-    <div className="flex flex-col h-screen bg-vox-bg text-vox-text overflow-hidden font-sans w-full">
-      {/* Top Navigation Bar */}
-      <div className="h-16 bg-white border-b border-vox-border flex items-center px-6 justify-between z-30 shadow-sm">
-        <div className="flex items-center gap-8">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-vox-primary rounded-lg flex items-center justify-center text-white font-bold">V</div>
-            <span className="font-black text-xl tracking-tighter text-vox-primary">VOX</span>
-          </div>
-          
-          <nav className="hidden md:flex items-center gap-1">
-            <button 
+    <div className="flex h-screen bg-vox-bg text-vox-text overflow-hidden font-sans w-full">
+      {/* 1. Server Sidebar (Far Left) */}
+      <div className="w-[72px] bg-slate-100 border-r border-vox-border flex flex-col items-center py-4 gap-3 z-40">
+        <div 
+          onClick={() => {
+            onSwitchServer(null);
+            setShowFriendsView(true);
+            onSwitchPrivateChat(null);
+          }}
+          className={cn(
+            "w-12 h-12 rounded-[24px] flex items-center justify-center transition-all cursor-pointer group relative",
+            !activeServer ? "bg-vox-primary text-white rounded-[16px]" : "bg-white text-vox-primary hover:bg-vox-primary hover:text-white hover:rounded-[16px]"
+          )}
+          title="Accueil"
+        >
+          <Users size={24} />
+          {!activeServer && (
+            <div className="absolute -left-2 w-1 h-8 bg-vox-primary rounded-r-full" />
+          )}
+        </div>
+        
+        <div className="w-8 h-[2px] bg-vox-border rounded-full mx-auto" />
+
+        <div className="flex-1 w-full overflow-y-auto flex flex-col items-center gap-2 px-2 custom-scrollbar">
+          {servers.map(srv => (
+            <div 
+              key={srv.id}
               onClick={() => {
-                setCurrentTab('home');
-                setShowFriendsView(true);
-                onSwitchServer(null);
-                onSwitchPrivateChat(null);
-              }}
-              className={cn(
-                "px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2",
-                currentTab === 'home' ? "bg-vox-primary/10 text-vox-primary" : "text-vox-muted hover:bg-slate-100"
-              )}
-            >
-              <Users size={18} />
-              Accueil
-            </button>
-            <button 
-              onClick={() => {
-                setCurrentTab('explore');
+                onSwitchServer(srv.id);
                 setShowFriendsView(false);
               }}
               className={cn(
-                "px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2",
-                currentTab === 'explore' ? "bg-vox-primary/10 text-vox-primary" : "text-vox-muted hover:bg-slate-100"
+                "w-12 h-12 rounded-[24px] flex items-center justify-center transition-all cursor-pointer group relative",
+                activeServer === srv.id ? "bg-vox-primary text-white rounded-[16px]" : "bg-white text-vox-muted hover:bg-vox-primary hover:text-white hover:rounded-[16px]"
               )}
+              title={srv.name}
             >
-              <ServerIcon size={18} />
-              Espaces
-            </button>
-          </nav>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div 
-            onClick={() => setShowProfileModal(true)}
-            className="flex items-center gap-3 px-3 py-1.5 bg-slate-50 rounded-2xl border border-vox-border cursor-pointer hover:bg-slate-100 transition-all"
-          >
-            {me?.avatar ? (
-              <img src={me.avatar} alt={me.username} className="w-7 h-7 rounded-lg object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <div className="w-7 h-7 bg-vox-primary rounded-lg flex items-center justify-center text-white text-[10px] font-bold">
-                {username[0].toUpperCase()}
+              <div className="font-black text-xs">
+                {srv.name.substring(0, 2).toUpperCase()}
               </div>
-            )}
-            <div className="flex flex-col items-start leading-tight hidden sm:flex">
-              <span className="text-xs font-bold">{me?.displayName || username}</span>
-              <span className="text-[9px] text-vox-muted font-bold">@{username}</span>
+              {activeServer === srv.id && (
+                <div className="absolute -left-2 w-1 h-8 bg-vox-primary rounded-r-full" />
+              )}
             </div>
-            <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-          </div>
-          <button 
-            onClick={() => setShowSettingsModal(true)}
-            className="p-2 text-vox-muted hover:text-vox-primary hover:bg-vox-primary/5 rounded-xl transition-all"
-          >
-            <Settings size={20} />
-          </button>
-          <button 
-            onClick={onLogout}
-            className="p-2 text-vox-muted hover:text-vox-accent hover:bg-vox-accent/5 rounded-xl transition-all"
-          >
-            <LogOut size={20} />
-          </button>
+          ))}
+          
+          {canCreateServer && (
+            <button 
+              onClick={() => setShowCreateServerModal(true)}
+              className="w-12 h-12 rounded-[24px] bg-white text-emerald-500 flex items-center justify-center hover:bg-emerald-500 hover:text-white hover:rounded-[16px] transition-all cursor-pointer"
+              title="Créer un espace"
+            >
+              <Plus size={24} />
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <div className="w-72 bg-white border-r border-vox-border flex flex-col z-20">
-          <div className="flex-1 overflow-y-auto p-4 space-y-6">
-            {currentTab === 'home' ? (
-              <>
-                <div>
-                  <div className="px-3 mb-3 text-[10px] font-black text-vox-muted uppercase tracking-[0.2em]">Navigation</div>
-                  <div 
-                    onClick={() => {
-                      setShowFriendsView(true);
-                      onSwitchPrivateChat(null);
-                    }}
-                    className={cn(
-                      "flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer transition-all font-bold text-sm mb-1",
-                      showFriendsView && !activePrivateChat ? "bg-vox-primary text-white shadow-lg shadow-indigo-100" : "text-vox-muted hover:bg-slate-50 hover:text-vox-text"
-                    )}
-                  >
-                    <Users size={18} />
-                    <span>Amis</span>
-                    {friendRequests.length > 0 && (
-                      <span className="ml-auto bg-vox-accent text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
-                        {friendRequests.length}
-                      </span>
-                    )}
-                  </div>
-                </div>
+      {/* 2. Channel/DM Sidebar (Middle) */}
+      <div className="w-64 bg-white border-r border-vox-border flex flex-col z-20">
+        <div className="h-16 px-4 flex items-center border-b border-vox-border shadow-sm">
+          <span className="font-black text-lg tracking-tighter text-vox-text truncate">
+            {activeServer ? currentServer?.name : "Messages Directs"}
+          </span>
+        </div>
 
-                <div>
-                  <div className="px-3 mb-3 text-[10px] font-black text-vox-muted uppercase tracking-[0.2em]">Messages Directs</div>
-                  <div className="space-y-1">
-                    {friends.map(f => (
+        <div className="flex-1 overflow-y-auto p-3 space-y-6">
+          {!activeServer ? (
+            <>
+              <div>
+                <div 
+                  onClick={() => {
+                    setShowFriendsView(true);
+                    onSwitchPrivateChat(null);
+                  }}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all font-bold text-sm mb-1",
+                    showFriendsView && !activePrivateChat ? "bg-vox-primary text-white shadow-md" : "text-vox-muted hover:bg-slate-50 hover:text-vox-text"
+                  )}
+                >
+                  <Users size={18} />
+                  <span>Amis</span>
+                  {friendRequests.length > 0 && (
+                    <span className="ml-auto bg-vox-accent text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
+                      {friendRequests.length}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <div className="px-3 mb-2 text-[9px] font-black text-vox-muted uppercase tracking-[0.2em]">Messages Directs</div>
+                <div className="space-y-0.5">
+                  {friends.map(f => (
+                    <div 
+                      key={f.username}
+                      onClick={() => {
+                        setShowFriendsView(false);
+                        onSwitchPrivateChat(f.username);
+                      }}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer transition-all font-bold text-sm",
+                        activePrivateChat === f.username ? "bg-vox-primary/10 text-vox-primary" : "text-vox-muted hover:bg-slate-50 hover:text-vox-text"
+                      )}
+                    >
                       <div 
-                        key={f.username}
-                        onClick={() => {
-                          setShowFriendsView(false);
-                          onSwitchPrivateChat(f.username);
+                        className="relative flex-shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const user = users.find(u => u.username === f.username);
+                          if (user) setViewingUser(user);
                         }}
-                        className={cn(
-                          "flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer transition-all font-bold text-sm",
-                          activePrivateChat === f.username ? "bg-vox-primary/10 text-vox-primary" : "text-vox-muted hover:bg-slate-50 hover:text-vox-text"
-                        )}
                       >
-                        <div 
-                          className="relative"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const user = users.find(u => u.username === f.username);
-                            if (user) setViewingUser(user);
-                          }}
-                        >
-                          {friends.find(fr => fr.username === f.username)?.username && users.find(u => u.username === f.username)?.avatar ? (
-                            <img 
-                              src={users.find(u => u.username === f.username)?.avatar} 
-                              alt={f.username} 
-                              className="w-8 h-8 rounded-xl object-cover" 
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center text-vox-muted font-bold text-[10px]">
-                              {f.username[0]?.toUpperCase()}
-                            </div>
-                          )}
-                          <div className={cn(
-                            "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white",
-                            f.status === 'online' ? "bg-emerald-500" : f.status === 'away' ? "bg-amber-500" : "bg-slate-400"
-                          )} />
-                        </div>
-                        <span className="truncate">{users.find(u => u.username === f.username)?.displayName || f.username}</span>
-                      </div>
-                    ))}
-                    {friends.length === 0 && (
-                      <div className="px-4 py-8 text-center border-2 border-dashed border-vox-border rounded-3xl">
-                        <p className="text-[10px] font-bold text-vox-muted uppercase">Aucun ami</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <div className="flex items-center justify-between px-3 mb-3">
-                    <div className="text-[10px] font-black text-vox-muted uppercase tracking-[0.2em]">Espaces</div>
-                    {canCreateServer && (
-                      <button 
-                        onClick={() => setShowCreateServerModal(true)}
-                        className="p-1 text-vox-primary hover:bg-vox-primary/10 rounded-lg transition-all"
-                      >
-                        <Plus size={16} />
-                      </button>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    {servers.map(srv => (
-                      <div 
-                        key={srv.id}
-                        onClick={() => onSwitchServer(srv.id)}
-                        className={cn(
-                          "flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer transition-all font-bold text-sm",
-                          activeServer === srv.id ? "bg-vox-primary/10 text-vox-primary" : "text-vox-muted hover:bg-slate-50 hover:text-vox-text"
-                        )}
-                      >
-                        <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center text-vox-muted font-bold text-[10px]">
-                          {srv.name.substring(0, 2).toUpperCase()}
-                        </div>
-                        <span className="truncate">{srv.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {activeServer && (
-                  <div>
-                    <div className="px-3 mb-3 mt-6 text-[10px] font-black text-vox-muted uppercase tracking-[0.2em]">Salons</div>
-                    <div className="space-y-1">
-                      {channels.map(ch => (
-                        <div key={ch.id}>
-                          <div 
-                            onClick={() => {
-                              setShowFriendsView(false);
-                              onSwitchChannel(ch.id);
-                            }}
-                            className={cn(
-                              "flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer transition-all font-bold text-sm",
-                              activeChannel === ch.id || activeVoiceChannel === ch.id ? "bg-vox-primary/10 text-vox-primary" : "text-vox-muted hover:bg-slate-50 hover:text-vox-text"
-                            )}
-                          >
-                            {ch.type === 'voice' ? <Volume2 size={18} /> : <Hash size={18} />}
-                            <span>{ch.name}</span>
+                        {users.find(u => u.username === f.username)?.avatar ? (
+                          <img 
+                            src={users.find(u => u.username === f.username)?.avatar} 
+                            alt={f.username} 
+                            className="w-8 h-8 rounded-xl object-cover" 
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center text-vox-muted font-bold text-[10px]">
+                            {f.username[0]?.toUpperCase()}
                           </div>
-                          
-                          {ch.type === 'voice' && voiceStates[ch.id] && voiceStates[ch.id].length > 0 && (
-                            <div className="ml-10 mt-1 mb-3 space-y-1">
-                              {voiceStates[ch.id].map(vu => (
-                                <div key={vu.sid} className="flex items-center gap-2 py-0.5">
-                                  <div className="w-4 h-4 bg-slate-100 rounded-md flex items-center justify-center text-vox-muted text-[7px] font-bold">
-                                    {vu.username[0].toUpperCase()}
-                                  </div>
-                                  <span className="text-[10px] font-bold text-vox-muted">{vu.username}</span>
-                                </div>
-                              ))}
+                        )}
+                        <div className={cn(
+                          "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white",
+                          f.status === 'online' ? "bg-emerald-500" : f.status === 'away' ? "bg-amber-500" : "bg-slate-400"
+                        )} />
+                      </div>
+                      <span className="truncate">{users.find(u => u.username === f.username)?.displayName || f.username}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div>
+              <div className="px-3 mb-2 text-[9px] font-black text-vox-muted uppercase tracking-[0.2em]">Salons</div>
+              <div className="space-y-0.5">
+                {channels.map(ch => (
+                  <div key={ch.id}>
+                    <div 
+                      onClick={() => {
+                        setShowFriendsView(false);
+                        onSwitchChannel(ch.id);
+                      }}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer transition-all font-bold text-sm",
+                        activeChannel === ch.id || activeVoiceChannel === ch.id ? "bg-vox-primary/10 text-vox-primary" : "text-vox-muted hover:bg-slate-50 hover:text-vox-text"
+                      )}
+                    >
+                      {ch.type === 'voice' ? <Volume2 size={18} /> : <Hash size={18} />}
+                      <span className="truncate">{ch.name}</span>
+                    </div>
+                    
+                    {ch.type === 'voice' && voiceStates[ch.id] && voiceStates[ch.id].length > 0 && (
+                      <div className="ml-9 mt-1 mb-2 space-y-1">
+                        {voiceStates[ch.id].map(vu => (
+                          <div key={vu.sid} className="flex items-center gap-2 py-0.5">
+                            <div className="w-4 h-4 bg-slate-100 rounded-md flex items-center justify-center text-vox-muted text-[7px] font-bold">
+                              {vu.username[0].toUpperCase()}
                             </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                            <span className="text-[10px] font-bold text-vox-muted">{vu.username}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Voice Connection Status */}
-          {activeVoiceChannel && (
-            <div className="p-4 bg-slate-50 border-t border-vox-border">
-              <div className="bg-white p-4 rounded-2xl border border-vox-primary/20 shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-vox-primary">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                    <span className="text-[9px] font-black uppercase tracking-widest">Vocal Actif</span>
-                  </div>
-                  <button onClick={onLeaveVoice} className="text-vox-accent hover:scale-110 transition-all">
-                    <PhoneOff size={14} />
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-vox-primary rounded-lg flex items-center justify-center text-white text-[9px] font-bold">
-                      {username[0].toUpperCase()}
-                    </div>
-                    <span className="text-[11px] font-bold text-vox-text">{username}</span>
-                    <button onClick={toggleMute} className="ml-auto text-vox-muted hover:text-vox-primary transition-all">
-                      {isMuted ? <MicOff size={12} className="text-vox-accent" /> : <Mic size={12} />}
-                    </button>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           )}
         </div>
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 bg-vox-bg relative">
+        {/* Profile & Voice Status at bottom of sidebar */}
+        <div className="p-2 bg-slate-50 border-t border-vox-border space-y-2">
+          {activeVoiceChannel && (
+            <div className="bg-white p-3 rounded-xl border border-vox-primary/20 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 text-vox-primary">
+                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                  <span className="text-[8px] font-black uppercase tracking-widest">Vocal</span>
+                </div>
+                <button onClick={onLeaveVoice} className="text-vox-accent hover:scale-110 transition-all">
+                  <PhoneOff size={12} />
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-vox-text truncate">Connecté</span>
+                <button onClick={toggleMute} className="ml-auto text-vox-muted hover:text-vox-primary transition-all">
+                  {isMuted ? <MicOff size={12} className="text-vox-accent" /> : <Mic size={12} />}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 p-1.5 bg-white rounded-xl border border-vox-border shadow-sm">
+            <div 
+              onClick={() => setShowProfileModal(true)}
+              className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:bg-slate-50 p-1 rounded-lg transition-all"
+            >
+              <div className="relative flex-shrink-0">
+                {me?.avatar ? (
+                  <img src={me.avatar} alt={me.username} className="w-8 h-8 rounded-lg object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="w-8 h-8 bg-vox-primary rounded-lg flex items-center justify-center text-white text-[10px] font-bold">
+                    {username[0].toUpperCase()}
+                  </div>
+                )}
+                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
+              </div>
+              <div className="flex flex-col min-w-0 leading-tight">
+                <span className="text-[11px] font-bold truncate">{me?.displayName || username}</span>
+                <span className="text-[9px] text-vox-muted font-bold truncate">@{username}</span>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-0.5">
+              <button 
+                onClick={() => setShowSettingsModal(true)}
+                className="p-1.5 text-vox-muted hover:text-vox-primary hover:bg-vox-primary/5 rounded-lg transition-all"
+                title="Paramètres"
+              >
+                <Settings size={16} />
+              </button>
+              <button 
+                onClick={onLogout}
+                className="p-1.5 text-vox-muted hover:text-vox-accent hover:bg-vox-accent/5 rounded-lg transition-all"
+                title="Déconnexion"
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Main Content Area (Right) */}
+      <div className="flex-1 flex flex-col min-w-0 bg-vox-bg relative">
           {showFriendsView ? (
             <div className="flex-1 flex flex-col">
               <div className="h-16 px-8 flex items-center justify-between bg-white/50 backdrop-blur-sm border-b border-vox-border">
@@ -939,8 +919,6 @@ export function ChatInterface({
           </div>
         </div>
       )}
-
-      </div>
 
       {/* Moderation Modal */}
       <AnimatePresence>
