@@ -311,6 +311,13 @@ async function startServer() {
       const user = users.get(socket.id);
       if (!user) return;
       
+      // If user was in another voice channel, leave it first
+      if (user.currentVoiceChannel && user.currentVoiceChannel !== channelId) {
+        const oldChannelId = user.currentVoiceChannel;
+        socket.leave(`voice:${oldChannelId}`);
+        socket.to(`voice:${oldChannelId}`).emit("user_left_voice", socket.id);
+      }
+      
       socket.join(`voice:${channelId}`);
       user.currentVoiceChannel = channelId;
       
