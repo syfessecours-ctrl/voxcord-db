@@ -246,7 +246,6 @@ export function ChatInterface({
     callsRef.current = {};
     remoteStreamsRef.current = {};
     setRemoteStreams(0);
-    onLeaveVoice();
   };
 
   const handleCreateServer = () => {

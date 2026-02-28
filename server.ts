@@ -569,6 +569,12 @@ async function startServer() {
       const user = users.get(socket.id);
       if (user) {
         const username = user.username;
+        
+        // Notify others in voice channel if user was in one
+        if (user.currentVoiceChannel) {
+          socket.to(`voice:${user.currentVoiceChannel}`).emit("user_left_voice", socket.id);
+        }
+
         users.delete(socket.id);
         await broadcastUserList();
 
