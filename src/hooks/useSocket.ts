@@ -19,7 +19,7 @@ export function useSocket(username: string) {
   const [voiceUsers, setVoiceUsers] = useState<{ sid: string, username: string }[]>([]);
   const [voiceStates, setVoiceStates] = useState<Record<string, { sid: string, username: string }[]>>({});
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [me, setMe] = useState<{ username: string, role: string } | null>(null);
+  const [me, setMe] = useState<User | null>(null);
   
   const socketRef = useRef<Socket | null>(null);
   const activeChannelRef = useRef(activeChannel);
@@ -171,6 +171,10 @@ export function useSocket(username: string) {
     socketRef.current?.emit('update_status', status);
   };
 
+  const updateProfile = (profile: { displayName?: string, avatar?: string, bio?: string }) => {
+    socketRef.current?.emit('update_profile', profile);
+  };
+
   const switchPrivateChat = (otherUser: string | null) => {
     setActivePrivateChat(otherUser);
     if (otherUser) {
@@ -266,6 +270,7 @@ export function useSocket(username: string) {
     sendFriendRequest,
     respondFriendRequest,
     updateStatus,
+    onUpdateProfile: updateProfile,
     switchPrivateChat,
     kickUser,
     banUser,

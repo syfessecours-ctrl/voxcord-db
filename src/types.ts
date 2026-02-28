@@ -4,6 +4,9 @@ export interface User {
   role: string;
   currentChannel: string;
   status?: 'online' | 'offline' | 'away';
+  displayName?: string;
+  avatar?: string;
+  bio?: string;
 }
 
 export interface FriendRequest {

@@ -77,7 +77,10 @@ async function initDb() {
       username TEXT PRIMARY KEY,
       password_hash TEXT,
       role TEXT DEFAULT 'user',
-      last_ip TEXT
+      last_ip TEXT,
+      display_name TEXT,
+      avatar TEXT,
+      bio TEXT
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -226,10 +229,25 @@ async function startServer() {
         userRecord = { username, role };
       }
 
-      users.set(socket.id, { username, id: socket.id, role: userRecord.role, currentChannel: 'general', status: 'online' });
+      users.set(socket.id, { 
+        username, 
+        id: socket.id, 
+        role: userRecord.role, 
+        currentChannel: 'general', 
+        status: 'online',
+        displayName: userRecord.display_name,
+        avatar: userRecord.avatar,
+        bio: userRecord.bio
+      });
       socket.join('general');
       
-      socket.emit("me", { username, role: userRecord.role });
+      socket.emit("me", { 
+        username, 
+        role: userRecord.role,
+        displayName: userRecord.display_name,
+        avatar: userRecord.avatar,
+        bio: userRecord.bio
+      });
       
       // Auto-join global server members if not already
       await execute("INSERT INTO server_members (server_id, username, timestamp) VALUES (?, ?, ?) ON CONFLICT DO NOTHING", ['voxcord-global', username, new Date().toISOString()]);
@@ -429,6 +447,28 @@ async function startServer() {
           }
         });
       }
+    });
+
+    socket.on("update_profile", async ({ displayName, avatar, bio }) => {
+      const user = users.get(socket.id);
+      if (!user) return;
+
+      await execute("UPDATE users SET display_name = ?, avatar = ?, bio = ? WHERE username = ?", [displayName, avatar, bio, user.username]);
+      
+      user.displayName = displayName;
+      user.avatar = avatar;
+      user.bio = bio;
+
+      // Update for the user themselves
+      socket.emit("me", { 
+        username: user.username, 
+        role: user.role,
+        displayName,
+        avatar,
+        bio
+      });
+
+      await broadcastUserList();
     });
 
     socket.on("send_friend_request", async (targetUsername) => {

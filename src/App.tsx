@@ -30,6 +30,7 @@ export default function App() {
     sendFriendRequest,
     respondFriendRequest,
     updateStatus,
+    onUpdateProfile,
     switchPrivateChat,
     kickUser,
     banUser,
@@ -89,6 +90,7 @@ export default function App() {
       onSendFriendRequest={sendFriendRequest}
       onRespondFriendRequest={respondFriendRequest}
       onUpdateStatus={updateStatus}
+      onUpdateProfile={onUpdateProfile}
       onSwitchPrivateChat={switchPrivateChat}
       onCreateServer={createServer}
       onInviteToServer={inviteToServer}
