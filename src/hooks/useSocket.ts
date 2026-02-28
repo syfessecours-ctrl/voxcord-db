@@ -210,6 +210,7 @@ export function useSocket(username: string) {
   };
 
   const joinVoice = (channelId: string) => {
+    if (activeVoiceChannel === channelId) return;
     if (activeVoiceChannel) leaveVoice();
     setActiveVoiceChannel(channelId);
     socketRef.current?.emit('join_voice', channelId);

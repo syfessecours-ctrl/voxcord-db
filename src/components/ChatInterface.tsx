@@ -112,6 +112,8 @@ export function ChatInterface({
   const callsRef = useRef<Record<string, any>>({});
   const remoteStreamsRef = useRef<Record<string, MediaStream>>({});
   const [remoteStreams, setRemoteStreams] = useState<number>(0); // Trigger re-render
+  const [myPeerId, setMyPeerId] = useState<string | null>(null);
+  const signaledUsersRef = useRef<Set<string>>(new Set());
 
   const isOwner = me?.role === 'owner';
   const isMod = isOwner || me?.role === 'moderator';
@@ -169,6 +171,17 @@ export function ChatInterface({
   }, [activeVoiceChannel]);
 
   useEffect(() => {
+    if (activeVoiceChannel && myPeerId) {
+      voiceUsers.forEach(vu => {
+        if (!signaledUsersRef.current.has(vu.sid) && vu.username !== username) {
+          onSendVoiceSignal(vu.sid, { type: 'peer-id', peerId: myPeerId });
+          signaledUsersRef.current.add(vu.sid);
+        }
+      });
+    }
+  }, [voiceUsers, activeVoiceChannel, myPeerId]);
+
+  useEffect(() => {
     const handleVoiceSignal = (e: any) => {
       const { from, signal, username: fromUser } = e.detail;
       if (peerRef.current && signal.type === 'peer-id') {
@@ -197,11 +210,7 @@ export function ChatInterface({
 
       peer.on('open', (id) => {
         console.log('[Voice] My peer ID is: ' + id);
-        onJoinVoice(activeVoiceChannel!);
-        // Broadcast our peer ID to others in the channel
-        voiceUsers.forEach(vu => {
-          onSendVoiceSignal(vu.sid, { type: 'peer-id', peerId: id });
-        });
+        setMyPeerId(id);
       });
 
       peer.on('call', (call) => {
@@ -232,6 +241,8 @@ export function ChatInterface({
     myStreamRef.current = null;
     peerRef.current?.destroy();
     peerRef.current = null;
+    setMyPeerId(null);
+    signaledUsersRef.current.clear();
     callsRef.current = {};
     remoteStreamsRef.current = {};
     setRemoteStreams(0);
