@@ -354,7 +354,7 @@ export function ChatInterface({
   return (
     <div className="flex h-screen bg-vox-bg text-vox-text overflow-hidden font-sans w-full">
       {/* 1. Server Sidebar (Far Left) */}
-      <div className="w-[72px] bg-slate-100 border-r border-vox-border flex flex-col items-center py-4 gap-3 z-40">
+      <div className="w-[72px] bg-vox-sidebar border-r border-vox-border flex flex-col items-center py-4 gap-3 z-40">
         <div 
           onClick={() => {
             onSwitchServer(null);
@@ -363,7 +363,7 @@ export function ChatInterface({
           }}
           className={cn(
             "w-12 h-12 rounded-[24px] flex items-center justify-center transition-all cursor-pointer group relative",
-            !activeServer ? "bg-vox-primary text-white rounded-[16px]" : "bg-white text-vox-primary hover:bg-vox-primary hover:text-white hover:rounded-[16px]"
+            !activeServer ? "bg-vox-primary text-white rounded-[16px]" : "bg-vox-surface text-vox-primary hover:bg-vox-primary hover:text-white hover:rounded-[16px]"
           )}
           title="Accueil"
         >
@@ -375,7 +375,7 @@ export function ChatInterface({
         
         <div className="w-8 h-[2px] bg-vox-border rounded-full mx-auto" />
 
-        <div className="flex-1 w-full overflow-y-auto flex flex-col items-center gap-2 px-2 custom-scrollbar">
+        <div className="flex-1 w-full overflow-y-auto flex flex-col items-center gap-2 px-2 discord-scrollbar">
           {servers.map(srv => (
             <div 
               key={srv.id}
@@ -385,7 +385,7 @@ export function ChatInterface({
               }}
               className={cn(
                 "w-12 h-12 rounded-[24px] flex items-center justify-center transition-all cursor-pointer group relative",
-                activeServer === srv.id ? "bg-vox-primary text-white rounded-[16px]" : "bg-white text-vox-muted hover:bg-vox-primary hover:text-white hover:rounded-[16px]"
+                activeServer === srv.id ? "bg-vox-primary text-white rounded-[16px]" : "bg-vox-surface text-vox-muted hover:bg-vox-primary hover:text-white hover:rounded-[16px]"
               )}
               title={srv.name}
             >
@@ -401,7 +401,7 @@ export function ChatInterface({
           {canCreateServer && (
             <button 
               onClick={() => setShowCreateServerModal(true)}
-              className="w-12 h-12 rounded-[24px] bg-white text-emerald-500 flex items-center justify-center hover:bg-emerald-500 hover:text-white hover:rounded-[16px] transition-all cursor-pointer"
+              className="w-12 h-12 rounded-[24px] bg-vox-surface text-emerald-500 flex items-center justify-center hover:bg-emerald-500 hover:text-white hover:rounded-[16px] transition-all cursor-pointer"
               title="Créer un espace"
             >
               <Plus size={24} />
@@ -411,14 +411,14 @@ export function ChatInterface({
       </div>
 
       {/* 2. Channel/DM Sidebar (Middle) */}
-      <div className="w-64 bg-white border-r border-vox-border flex flex-col z-20">
+      <div className="w-64 bg-vox-sidebar border-r border-vox-border flex flex-col z-20">
         <div className="h-16 px-4 flex items-center border-b border-vox-border shadow-sm">
           <span className="font-black text-lg tracking-tighter text-vox-text truncate">
             {activeServer ? currentServer?.name : "Messages Directs"}
           </span>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 space-y-6">
+        <div className="flex-1 overflow-y-auto p-3 space-y-6 discord-scrollbar">
           {!activeServer ? (
             <>
               <div>
@@ -428,8 +428,8 @@ export function ChatInterface({
                     onSwitchPrivateChat(null);
                   }}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all font-bold text-sm mb-1",
-                    showFriendsView && !activePrivateChat ? "bg-vox-primary text-white shadow-md" : "text-vox-muted hover:bg-slate-50 hover:text-vox-text"
+                    "flex items-center gap-3 px-3 py-2.5 rounded-2xl cursor-pointer transition-all font-bold text-sm mb-1",
+                    showFriendsView && !activePrivateChat ? "bg-vox-primary text-white shadow-lg shadow-vox-primary/20" : "text-vox-muted hover:bg-vox-surface hover:text-vox-text"
                   )}
                 >
                   <Users size={18} />
@@ -453,8 +453,8 @@ export function ChatInterface({
                         onSwitchPrivateChat(f.username);
                       }}
                       className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer transition-all font-bold text-sm",
-                        activePrivateChat === f.username ? "bg-vox-primary/10 text-vox-primary" : "text-vox-muted hover:bg-slate-50 hover:text-vox-text"
+                        "flex items-center gap-3 px-3 py-2 rounded-2xl cursor-pointer transition-all font-bold text-sm",
+                        activePrivateChat === f.username ? "bg-vox-primary/10 text-vox-primary" : "text-vox-muted hover:bg-vox-surface hover:text-vox-text"
                       )}
                     >
                       <div 
@@ -473,13 +473,13 @@ export function ChatInterface({
                             referrerPolicy="no-referrer"
                           />
                         ) : (
-                          <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center text-vox-muted font-bold text-[10px]">
+                          <div className="w-8 h-8 bg-vox-surface rounded-xl flex items-center justify-center text-vox-muted font-bold text-[10px] border border-vox-border">
                             {f.username[0]?.toUpperCase()}
                           </div>
                         )}
                         <div className={cn(
-                          "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white",
-                          f.status === 'online' ? "bg-emerald-500" : f.status === 'away' ? "bg-amber-500" : "bg-slate-400"
+                          "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-vox-sidebar",
+                          f.status === 'online' ? "bg-emerald-500" : f.status === 'away' ? "bg-amber-500" : "bg-vox-muted"
                         )} />
                       </div>
                       <span className="truncate">{users.find(u => u.username === f.username)?.displayName || f.username}</span>
@@ -500,8 +500,8 @@ export function ChatInterface({
                         onSwitchChannel(ch.id);
                       }}
                       className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer transition-all font-bold text-sm",
-                        activeChannel === ch.id || activeVoiceChannel === ch.id ? "bg-vox-primary/10 text-vox-primary" : "text-vox-muted hover:bg-slate-50 hover:text-vox-text"
+                        "flex items-center gap-3 px-3 py-2 rounded-2xl cursor-pointer transition-all font-bold text-sm",
+                        activeChannel === ch.id || activeVoiceChannel === ch.id ? "bg-vox-primary/10 text-vox-primary" : "text-vox-muted hover:bg-vox-surface hover:text-vox-text"
                       )}
                     >
                       {ch.type === 'voice' ? <Volume2 size={18} /> : <Hash size={18} />}
@@ -512,7 +512,7 @@ export function ChatInterface({
                       <div className="ml-9 mt-1 mb-2 space-y-1">
                         {voiceStates[ch.id].map(vu => (
                           <div key={vu.sid} className="flex items-center gap-2 py-0.5">
-                            <div className="w-4 h-4 bg-slate-100 rounded-md flex items-center justify-center text-vox-muted text-[7px] font-bold">
+                            <div className="w-4 h-4 bg-vox-surface rounded-md flex items-center justify-center text-vox-muted text-[7px] font-bold border border-vox-border">
                               {vu.username[0].toUpperCase()}
                             </div>
                             <span className="text-[10px] font-bold text-vox-muted">{vu.username}</span>
@@ -528,9 +528,9 @@ export function ChatInterface({
         </div>
 
         {/* Profile & Voice Status at bottom of sidebar */}
-        <div className="p-2 bg-slate-50 border-t border-vox-border space-y-2">
+        <div className="p-2 bg-vox-sidebar border-t border-vox-border space-y-2">
           {activeVoiceChannel && (
-            <div className="bg-white p-3 rounded-xl border border-vox-primary/20 shadow-sm">
+            <div className="bg-vox-surface p-3 rounded-2xl border border-vox-primary/20 shadow-sm">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2 text-vox-primary">
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
@@ -549,20 +549,20 @@ export function ChatInterface({
             </div>
           )}
 
-          <div className="flex items-center gap-2 p-1.5 bg-white rounded-xl border border-vox-border shadow-sm">
+          <div className="flex items-center gap-2 p-1.5 bg-vox-surface rounded-2xl border border-vox-border shadow-sm">
             <div 
               onClick={() => setShowProfileModal(true)}
-              className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:bg-slate-50 p-1 rounded-lg transition-all"
+              className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:bg-vox-bg p-1 rounded-xl transition-all"
             >
               <div className="relative flex-shrink-0">
                 {me?.avatar ? (
-                  <img src={me.avatar} alt={me.username} className="w-8 h-8 rounded-lg object-cover" referrerPolicy="no-referrer" />
+                  <img src={me.avatar} alt={me.username} className="w-8 h-8 rounded-xl object-cover" referrerPolicy="no-referrer" />
                 ) : (
-                  <div className="w-8 h-8 bg-vox-primary rounded-lg flex items-center justify-center text-white text-[10px] font-bold">
+                  <div className="w-8 h-8 bg-vox-primary rounded-xl flex items-center justify-center text-white text-[10px] font-bold">
                     {username[0].toUpperCase()}
                   </div>
                 )}
-                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
+                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-vox-surface" />
               </div>
               <div className="flex flex-col min-w-0 leading-tight">
                 <span className="text-[11px] font-bold truncate">{me?.displayName || username}</span>
@@ -573,14 +573,14 @@ export function ChatInterface({
             <div className="flex items-center gap-0.5">
               <button 
                 onClick={() => setShowSettingsModal(true)}
-                className="p-1.5 text-vox-muted hover:text-vox-primary hover:bg-vox-primary/5 rounded-lg transition-all"
+                className="p-1.5 text-vox-muted hover:text-vox-primary hover:bg-vox-primary/5 rounded-xl transition-all"
                 title="Paramètres"
               >
                 <Settings size={16} />
               </button>
               <button 
                 onClick={onLogout}
-                className="p-1.5 text-vox-muted hover:text-vox-accent hover:bg-vox-accent/5 rounded-lg transition-all"
+                className="p-1.5 text-vox-muted hover:text-vox-accent hover:bg-vox-accent/5 rounded-xl transition-all"
                 title="Déconnexion"
               >
                 <LogOut size={16} />
@@ -594,7 +594,7 @@ export function ChatInterface({
       <div className="flex-1 flex flex-col min-w-0 bg-vox-bg relative">
           {showFriendsView ? (
             <div className="flex-1 flex flex-col">
-              <div className="h-16 px-8 flex items-center justify-between bg-white/50 backdrop-blur-sm border-b border-vox-border">
+              <div className="h-16 px-8 flex items-center justify-between bg-vox-surface/50 backdrop-blur-md border-b border-vox-border">
                 <div className="flex items-center gap-3">
                   <Users size={20} className="text-vox-primary" />
                   <span className="font-black text-lg tracking-tight">Gestion des Amis</span>
@@ -606,7 +606,7 @@ export function ChatInterface({
                       placeholder="Ajouter par pseudo..."
                       value={friendSearch}
                       onChange={(e) => setFriendSearch(e.target.value)}
-                      className="bg-white border border-vox-border rounded-2xl px-5 py-2 text-xs text-vox-text outline-none focus:ring-4 focus:ring-vox-primary/5 focus:border-vox-primary transition-all w-64 font-bold"
+                      className="bg-vox-surface border border-vox-border rounded-2xl px-5 py-2 text-xs text-vox-text outline-none focus:ring-4 focus:ring-vox-primary/5 focus:border-vox-primary transition-all w-64 font-bold"
                     />
                     <button 
                       onClick={() => {
@@ -624,15 +624,15 @@ export function ChatInterface({
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-8 space-y-12">
+              <div className="flex-1 overflow-y-auto p-8 space-y-12 discord-scrollbar">
                 {friendRequests.length > 0 && (
                   <div>
                     <div className="text-[10px] font-black text-vox-muted uppercase tracking-[0.2em] mb-6">Demandes en attente ({friendRequests.length})</div>
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                       {friendRequests.map(req => (
-                        <div key={req.id} className="bg-white border border-vox-border p-6 rounded-[2rem] flex items-center justify-between shadow-sm hover:shadow-md transition-all">
+                        <div key={req.id} className="bg-vox-surface border border-vox-border p-6 rounded-[2rem] flex items-center justify-between shadow-sm hover:shadow-md transition-all">
                           <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-vox-muted font-black text-lg border border-vox-border">
+                            <div className="w-14 h-14 bg-vox-bg rounded-2xl flex items-center justify-center text-vox-muted font-black text-lg border border-vox-border">
                               {req.from_user[0].toUpperCase()}
                             </div>
                             <div>
@@ -643,13 +643,13 @@ export function ChatInterface({
                           <div className="flex gap-2">
                             <button 
                               onClick={() => onRespondFriendRequest(req.id, 'accepted')}
-                              className="w-10 h-10 flex items-center justify-center bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-xl transition-all shadow-sm"
+                              className="w-10 h-10 flex items-center justify-center bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white rounded-xl transition-all shadow-sm"
                             >
                               <Check size={20} />
                             </button>
                             <button 
                               onClick={() => onRespondFriendRequest(req.id, 'rejected')}
-                              className="w-10 h-10 flex items-center justify-center bg-vox-accent/5 text-vox-accent hover:bg-vox-accent hover:text-white rounded-xl transition-all shadow-sm"
+                              className="w-10 h-10 flex items-center justify-center bg-vox-accent/10 text-vox-accent hover:bg-vox-accent hover:text-white rounded-xl transition-all shadow-sm"
                             >
                               <X size={20} />
                             </button>
@@ -666,7 +666,7 @@ export function ChatInterface({
                     {friends.map(f => (
                       <div 
                         key={f.username} 
-                        className="bg-white border border-vox-border p-6 rounded-[2rem] flex items-center justify-between group hover:border-vox-primary/30 hover:shadow-lg hover:shadow-indigo-500/5 transition-all cursor-pointer shadow-sm"
+                        className="bg-vox-surface border border-vox-border p-6 rounded-[2rem] flex items-center justify-between group hover:border-vox-primary/30 hover:shadow-lg hover:shadow-vox-primary/5 transition-all cursor-pointer shadow-sm"
                         onClick={() => {
                           setShowFriendsView(false);
                           onSwitchPrivateChat(f.username);
@@ -674,12 +674,12 @@ export function ChatInterface({
                       >
                         <div className="flex items-center gap-4">
                           <div className="relative">
-                            <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-vox-muted font-black text-lg border border-vox-border">
+                            <div className="w-14 h-14 bg-vox-bg rounded-2xl flex items-center justify-center text-vox-muted font-black text-lg border border-vox-border">
                               {f.username[0].toUpperCase()}
                             </div>
                             <div className={cn(
-                              "absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-4 border-white",
-                              f.status === 'online' ? "bg-emerald-500" : f.status === 'away' ? "bg-amber-500" : "bg-slate-400"
+                              "absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-4 border-vox-surface",
+                              f.status === 'online' ? "bg-emerald-500" : f.status === 'away' ? "bg-amber-500" : "bg-vox-muted"
                             )} />
                           </div>
                           <div>
@@ -687,13 +687,13 @@ export function ChatInterface({
                             <div className="text-[10px] font-bold text-vox-muted uppercase tracking-widest">{f.status}</div>
                           </div>
                         </div>
-                        <div className="w-10 h-10 flex items-center justify-center bg-slate-50 text-vox-muted group-hover:bg-vox-primary group-hover:text-white rounded-xl transition-all">
+                        <div className="w-10 h-10 flex items-center justify-center bg-vox-bg text-vox-muted group-hover:bg-vox-primary group-hover:text-white rounded-xl transition-all">
                           <MessageSquare size={20} />
                         </div>
                       </div>
                     ))}
                     {friends.length === 0 && (
-                      <div className="col-span-full h-64 flex flex-col items-center justify-center text-vox-muted border-2 border-dashed border-vox-border rounded-[3rem] bg-white/30">
+                      <div className="col-span-full h-64 flex flex-col items-center justify-center text-vox-muted border-2 border-dashed border-vox-border rounded-[3rem] bg-vox-surface/30">
                         <Users size={48} className="mb-4 opacity-10" />
                         <p className="text-sm font-black uppercase tracking-widest opacity-40">Aucun ami pour le moment</p>
                       </div>
@@ -705,18 +705,18 @@ export function ChatInterface({
           ) : (
             <>
               {/* Chat Header */}
-              <div className="h-16 px-8 flex items-center justify-between bg-white/50 backdrop-blur-sm border-b border-vox-border">
+              <div className="h-16 px-8 flex items-center justify-between bg-vox-surface/50 backdrop-blur-md border-b border-vox-border">
                 <div className="flex items-center gap-4">
                   {activePrivateChat ? (
                     <>
                       <div className="relative">
-                        <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-vox-muted font-black text-sm border border-vox-border">
+                        <div className="w-10 h-10 bg-vox-surface rounded-xl flex items-center justify-center text-vox-muted font-black text-sm border border-vox-border">
                           {activePrivateChat[0]?.toUpperCase()}
                         </div>
                         <div className={cn(
-                          "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white",
+                          "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-vox-surface",
                           friends.find(f => f.username === activePrivateChat)?.status === 'online' ? "bg-emerald-500" : 
-                          friends.find(f => f.username === activePrivateChat)?.status === 'away' ? "bg-amber-500" : "bg-slate-400"
+                          friends.find(f => f.username === activePrivateChat)?.status === 'away' ? "bg-amber-500" : "bg-vox-muted"
                         )} />
                       </div>
                       <div className="flex flex-col">
@@ -760,7 +760,7 @@ export function ChatInterface({
               </div>
 
               {/* Messages Area */}
-              <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 space-y-8 scroll-smooth">
+              <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 space-y-8 scroll-smooth discord-scrollbar">
                 {displayMessages.length === 0 && (
                   <div className="h-full flex flex-col items-center justify-center text-vox-muted opacity-30">
                     <MessageSquare size={64} className="mb-4" />
@@ -775,7 +775,7 @@ export function ChatInterface({
                       isMe ? "ml-auto flex-row-reverse" : ""
                     )}>
                       <div 
-                        className="w-10 h-10 bg-white border border-vox-border rounded-xl flex-shrink-0 flex items-center justify-center text-vox-muted font-black text-xs shadow-sm cursor-pointer overflow-hidden"
+                        className="w-10 h-10 bg-vox-surface border border-vox-border rounded-xl flex-shrink-0 flex items-center justify-center text-vox-muted font-black text-xs shadow-sm cursor-pointer overflow-hidden"
                         onClick={() => {
                           const user = users.find(u => u.username === ((msg as any).user || (msg as any).from_user));
                           if (user) setViewingUser(user);
@@ -808,16 +808,16 @@ export function ChatInterface({
                           </span>
                         </div>
                         <div className={cn(
-                          "px-5 py-3.5 rounded-[1.5rem] text-sm leading-relaxed break-words shadow-sm border",
-                          isMe ? "bg-vox-primary text-white border-vox-primary/20 rounded-tr-none" : "bg-white text-vox-text border-vox-border rounded-tl-none"
+                          "px-5 py-3.5 rounded-2xl text-sm leading-relaxed break-words shadow-sm border",
+                          isMe ? "bg-vox-primary text-white border-vox-primary/20 rounded-tr-none" : "bg-vox-surface text-vox-text border-vox-border rounded-tl-none"
                         )}>
                           {msg.text}
                           {msg.file && (
-                            <div className="mt-3 rounded-xl overflow-hidden border border-black/5">
+                            <div className="mt-3 rounded-xl overflow-hidden border border-white/10">
                               {msg.file.startsWith('data:image') ? (
                                 <img src={msg.file} alt="Upload" className="max-h-64 w-full object-cover" />
                               ) : (
-                                <div className="p-3 bg-black/5 flex items-center gap-3">
+                                <div className="p-3 bg-white/5 flex items-center gap-3">
                                   <ImageIcon size={20} />
                                   <a href={msg.file} download="file" className="text-[10px] font-black uppercase tracking-widest hover:underline">Fichier</a>
                                 </div>
@@ -844,7 +844,7 @@ export function ChatInterface({
 
               {/* Input Area */}
               <div className="p-8 pt-0">
-                <div className="bg-white rounded-[2.5rem] border border-vox-border p-2 shadow-xl shadow-indigo-500/5 focus-within:border-vox-primary/50 transition-all">
+                <div className="bg-vox-surface rounded-[2rem] border border-vox-border p-2 shadow-xl shadow-vox-primary/5 focus-within:border-vox-primary/50 transition-all">
                   <form 
                     onSubmit={handleSendMessage}
                     className="flex items-center gap-2"
@@ -864,7 +864,7 @@ export function ChatInterface({
                       <button type="button" className="w-12 h-12 flex items-center justify-center text-vox-muted hover:text-vox-primary hover:bg-vox-primary/5 rounded-full transition-all">
                         <Smile size={24} />
                       </button>
-                      <button type="submit" disabled={!inputText.trim()} className="w-12 h-12 flex items-center justify-center bg-vox-primary text-white rounded-full hover:bg-vox-primary-hover hover:scale-105 active:scale-95 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:hover:scale-100">
+                      <button type="submit" disabled={!inputText.trim()} className="w-12 h-12 flex items-center justify-center bg-vox-primary text-white rounded-full hover:bg-vox-primary-hover hover:scale-105 active:scale-95 transition-all shadow-lg shadow-vox-primary/20 disabled:opacity-50 disabled:hover:scale-100">
                         <Send size={20} />
                       </button>
                     </div>
@@ -877,30 +877,30 @@ export function ChatInterface({
 
       {/* Members Sidebar */}
       {!showFriendsView && activeServer && (
-        <div className="w-64 bg-white border-l border-vox-border hidden lg:flex flex-col z-10">
+        <div className="w-64 bg-vox-sidebar border-l border-vox-border hidden lg:flex flex-col z-10">
           <div className="h-16 px-6 flex items-center border-b border-vox-border">
             <span className="text-[10px] font-black text-vox-muted uppercase tracking-[0.2em]">Membres — {users.length}</span>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-1">
+          <div className="flex-1 overflow-y-auto p-4 space-y-1 discord-scrollbar">
             {users.map(u => (
               <div 
                 key={u.id} 
                 onClick={() => setViewingUser(u)}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-slate-50 transition-all group cursor-pointer"
+                  "flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-vox-surface transition-all group cursor-pointer"
                 )}
               >
                 <div className="relative">
                   {u.avatar ? (
                     <img src={u.avatar} alt={u.username} className="w-8 h-8 rounded-xl object-cover border border-vox-border" referrerPolicy="no-referrer" />
                   ) : (
-                    <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center text-vox-muted font-black text-[10px] border border-vox-border">
+                    <div className="w-8 h-8 bg-vox-surface rounded-xl flex items-center justify-center text-vox-muted font-black text-[10px] border border-vox-border">
                       {u.username[0].toUpperCase()}
                     </div>
                   )}
                   <div className={cn(
-                    "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white",
-                    u.status === 'online' ? "bg-emerald-500" : u.status === 'away' ? "bg-amber-500" : "bg-slate-400"
+                    "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-vox-sidebar",
+                    u.status === 'online' ? "bg-emerald-500" : u.status === 'away' ? "bg-amber-500" : "bg-vox-muted"
                   )} />
                 </div>
                 <div className="flex flex-col min-w-0">
@@ -923,21 +923,21 @@ export function ChatInterface({
       {/* Moderation Modal */}
       <AnimatePresence>
         {selectedUser && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="w-full max-w-sm bg-white p-8 rounded-[3rem] border border-vox-border shadow-2xl relative overflow-hidden"
+              className="w-full max-w-sm bg-vox-surface p-8 rounded-[3rem] border border-vox-border shadow-2xl relative overflow-hidden"
             >
               <div className="absolute top-0 left-0 w-full h-2 bg-vox-primary" />
               
               <div className="flex flex-col items-center text-center mb-8 pt-4">
-                <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center text-vox-muted font-black text-3xl border-2 border-vox-border mb-4 shadow-sm">
+                <div className="w-20 h-20 bg-vox-bg rounded-[2rem] flex items-center justify-center text-vox-muted font-black text-3xl border-2 border-vox-border mb-4 shadow-sm">
                   {selectedUser.username[0].toUpperCase()}
                 </div>
                 <h3 className="text-2xl font-black text-vox-text tracking-tight">{selectedUser.username}</h3>
-                <div className="px-3 py-1 bg-slate-100 rounded-full text-[9px] font-black text-vox-muted uppercase tracking-widest mt-2">
+                <div className="px-3 py-1 bg-vox-bg rounded-full text-[9px] font-black text-vox-muted uppercase tracking-widest mt-2 border border-vox-border">
                   Options de Modération
                 </div>
               </div>
@@ -948,7 +948,7 @@ export function ChatInterface({
                     {selectedUser.role !== 'moderator' ? (
                       <button 
                         onClick={() => handleSetRole(selectedUser.username, 'moderator')}
-                        className="w-full flex items-center justify-between p-4 bg-vox-primary/5 hover:bg-vox-primary text-vox-primary hover:text-white rounded-2xl transition-all font-black text-xs uppercase tracking-widest group"
+                        className="w-full flex items-center justify-between p-4 bg-vox-primary/10 hover:bg-vox-primary text-vox-primary hover:text-white rounded-2xl transition-all font-black text-xs uppercase tracking-widest group"
                       >
                         <span>Promouvoir Modérateur</span>
                         <ShieldAlert size={18} className="group-hover:scale-110 transition-transform" />
@@ -956,7 +956,7 @@ export function ChatInterface({
                     ) : (
                       <button 
                         onClick={() => handleSetRole(selectedUser.username, 'user')}
-                        className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-200 text-vox-muted rounded-2xl transition-all font-black text-xs uppercase tracking-widest group"
+                        className="w-full flex items-center justify-between p-4 bg-vox-bg hover:bg-vox-sidebar text-vox-muted rounded-2xl transition-all font-black text-xs uppercase tracking-widest group border border-vox-border"
                       >
                         <span>Rétrograder</span>
                         <UserX size={18} className="group-hover:scale-110 transition-transform" />
@@ -971,7 +971,7 @@ export function ChatInterface({
                     if (reason) onKickUser(selectedUser.username, reason);
                     setSelectedUser(null);
                   }}
-                  className="w-full flex items-center justify-between p-4 bg-amber-50 hover:bg-amber-500 text-amber-600 hover:text-white rounded-2xl transition-all font-black text-xs uppercase tracking-widest group"
+                  className="w-full flex items-center justify-between p-4 bg-amber-500/10 hover:bg-amber-500 text-amber-500 hover:text-white rounded-2xl transition-all font-black text-xs uppercase tracking-widest group"
                 >
                   <span>Expulser (Kick)</span>
                   <UserX size={18} className="group-hover:scale-110 transition-transform" />
@@ -983,7 +983,7 @@ export function ChatInterface({
                       if (reason) onBanUser(selectedUser.username, reason);
                       setSelectedUser(null);
                     }}
-                    className="w-full flex items-center justify-between p-4 bg-vox-accent/5 hover:bg-vox-accent text-vox-accent hover:text-white rounded-2xl transition-all font-black text-xs uppercase tracking-widest group"
+                    className="w-full flex items-center justify-between p-4 bg-vox-accent/10 hover:bg-vox-accent text-vox-accent hover:text-white rounded-2xl transition-all font-black text-xs uppercase tracking-widest group"
                   >
                     <span>Bannir (Ban IP)</span>
                     <Ban size={18} className="group-hover:scale-110 transition-transform" />
@@ -1004,12 +1004,12 @@ export function ChatInterface({
       {/* Settings Modal */}
       <AnimatePresence>
         {showSettingsModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 40 }}
-              className="w-full max-w-md bg-white p-10 rounded-[3rem] border border-vox-border shadow-2xl relative overflow-hidden"
+              className="w-full max-w-md bg-vox-surface p-10 rounded-[3rem] border border-vox-border shadow-2xl relative overflow-hidden"
             >
               <div className="absolute top-0 left-0 w-full h-2 bg-vox-primary" />
               
@@ -1019,7 +1019,7 @@ export function ChatInterface({
               </div>
               
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-6 bg-slate-50 rounded-[2rem] border border-vox-border group hover:border-vox-primary/30 transition-all">
+                <div className="flex items-center justify-between p-6 bg-vox-bg rounded-[2rem] border border-vox-border group hover:border-vox-primary/30 transition-all">
                   <div>
                     <div className="text-sm font-black text-vox-text mb-1">Annulation d'écho</div>
                     <div className="text-[9px] text-vox-muted font-black uppercase tracking-[0.2em] opacity-50">Echo Cancellation</div>
@@ -1028,7 +1028,7 @@ export function ChatInterface({
                     onClick={() => setEchoCancellation(!echoCancellation)}
                     className={cn(
                       "w-14 h-8 rounded-full transition-all relative p-1",
-                      echoCancellation ? "bg-vox-primary" : "bg-slate-300"
+                      echoCancellation ? "bg-vox-primary" : "bg-vox-sidebar"
                     )}
                   >
                     <div className={cn(
@@ -1038,7 +1038,7 @@ export function ChatInterface({
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between p-6 bg-slate-50 rounded-[2rem] border border-vox-border group hover:border-vox-primary/30 transition-all">
+                <div className="flex items-center justify-between p-6 bg-vox-bg rounded-[2rem] border border-vox-border group hover:border-vox-primary/30 transition-all">
                   <div>
                     <div className="text-sm font-black text-vox-text mb-1">Suppression du bruit</div>
                     <div className="text-[9px] text-vox-muted font-black uppercase tracking-[0.2em] opacity-50">Noise Suppression</div>
@@ -1047,7 +1047,7 @@ export function ChatInterface({
                     onClick={() => setNoiseSuppression(!noiseSuppression)}
                     className={cn(
                       "w-14 h-8 rounded-full transition-all relative p-1",
-                      noiseSuppression ? "bg-vox-primary" : "bg-slate-300"
+                      noiseSuppression ? "bg-vox-primary" : "bg-vox-sidebar"
                     )}
                   >
                     <div className={cn(
@@ -1057,16 +1057,16 @@ export function ChatInterface({
                   </button>
                 </div>
 
-                <div className="p-6 bg-amber-50 border border-amber-100 rounded-[2rem] flex gap-4">
+                <div className="p-6 bg-amber-500/10 border border-amber-500/20 rounded-[2rem] flex gap-4">
                   <ShieldAlert size={24} className="text-amber-500 flex-shrink-0" />
-                  <p className="text-[10px] text-amber-700 font-black uppercase tracking-widest leading-relaxed">
+                  <p className="text-[10px] text-amber-500 font-black uppercase tracking-widest leading-relaxed">
                     Les changements prendront effet lors de votre prochaine connexion vocale.
                   </p>
                 </div>
 
                 <button 
                   onClick={() => setShowSettingsModal(false)}
-                  className="w-full py-5 px-4 bg-vox-text text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-black transition-all mt-6 shadow-lg shadow-slate-200"
+                  className="w-full py-5 px-4 bg-vox-primary text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-vox-primary-hover transition-all mt-6 shadow-lg shadow-vox-primary/20"
                 >
                   Enregistrer & Fermer
                 </button>
@@ -1079,17 +1079,17 @@ export function ChatInterface({
       {/* Profile Edit Modal */}
       <AnimatePresence>
         {showProfileModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="bg-vox-surface w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden border border-vox-border"
             >
               <div className="p-8">
                 <div className="flex items-center justify-between mb-8">
                   <h2 className="text-2xl font-black tracking-tight">Mon Profil</h2>
-                  <button onClick={() => setShowProfileModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all">
+                  <button onClick={() => setShowProfileModal(false)} className="p-2 hover:bg-vox-bg rounded-full transition-all">
                     <X size={24} />
                   </button>
                 </div>
@@ -1101,7 +1101,7 @@ export function ChatInterface({
                       type="text"
                       value={profileForm.avatar}
                       onChange={(e) => setProfileForm(prev => ({ ...prev, avatar: e.target.value }))}
-                      className="w-full bg-slate-50 border border-vox-border rounded-2xl px-5 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-vox-primary/5 focus:border-vox-primary transition-all"
+                      className="w-full bg-vox-bg border border-vox-border rounded-2xl px-5 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-vox-primary/5 focus:border-vox-primary transition-all"
                       placeholder="https://..."
                     />
                   </div>
@@ -1111,7 +1111,7 @@ export function ChatInterface({
                       type="text"
                       value={profileForm.displayName}
                       onChange={(e) => setProfileForm(prev => ({ ...prev, displayName: e.target.value }))}
-                      className="w-full bg-slate-50 border border-vox-border rounded-2xl px-5 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-vox-primary/5 focus:border-vox-primary transition-all"
+                      className="w-full bg-vox-bg border border-vox-border rounded-2xl px-5 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-vox-primary/5 focus:border-vox-primary transition-all"
                       placeholder="Votre nom"
                     />
                   </div>
@@ -1120,13 +1120,13 @@ export function ChatInterface({
                     <textarea 
                       value={profileForm.bio}
                       onChange={(e) => setProfileForm(prev => ({ ...prev, bio: e.target.value }))}
-                      className="w-full bg-slate-50 border border-vox-border rounded-2xl px-5 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-vox-primary/5 focus:border-vox-primary transition-all h-24 resize-none"
+                      className="w-full bg-vox-bg border border-vox-border rounded-2xl px-5 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-vox-primary/5 focus:border-vox-primary transition-all h-24 resize-none"
                       placeholder="Parlez-nous de vous..."
                     />
                   </div>
                   <button 
                     type="submit"
-                    className="w-full bg-vox-primary text-white py-4 rounded-2xl font-black text-sm shadow-lg shadow-indigo-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    className="w-full bg-vox-primary text-white py-4 rounded-2xl font-black text-sm shadow-lg shadow-vox-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
                   >
                     Enregistrer
                   </button>
@@ -1140,30 +1140,30 @@ export function ChatInterface({
       {/* User Profile View Modal */}
       <AnimatePresence>
         {viewingUser && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="bg-vox-surface w-full max-w-sm rounded-[3rem] shadow-2xl overflow-hidden border border-vox-border"
             >
               <div className="h-24 bg-vox-primary" />
               <div className="px-8 pb-8 -mt-12">
                 <div className="flex justify-between items-end mb-4">
                   <div className="relative">
                     {viewingUser.avatar ? (
-                      <img src={viewingUser.avatar} alt={viewingUser.username} className="w-24 h-24 rounded-[2rem] border-4 border-white object-cover shadow-lg" referrerPolicy="no-referrer" />
+                      <img src={viewingUser.avatar} alt={viewingUser.username} className="w-24 h-24 rounded-[2rem] border-4 border-vox-surface object-cover shadow-lg" referrerPolicy="no-referrer" />
                     ) : (
-                      <div className="w-24 h-24 bg-slate-100 rounded-[2rem] border-4 border-white flex items-center justify-center text-vox-muted font-black text-3xl shadow-lg">
+                      <div className="w-24 h-24 bg-vox-bg rounded-[2rem] border-4 border-vox-surface flex items-center justify-center text-vox-muted font-black text-3xl shadow-lg">
                         {viewingUser.username[0].toUpperCase()}
                       </div>
                     )}
                     <div className={cn(
-                      "absolute bottom-1 right-1 w-6 h-6 rounded-full border-4 border-white",
-                      viewingUser.status === 'online' ? "bg-emerald-500" : viewingUser.status === 'away' ? "bg-amber-500" : "bg-slate-400"
+                      "absolute bottom-1 right-1 w-6 h-6 rounded-full border-4 border-vox-surface",
+                      viewingUser.status === 'online' ? "bg-emerald-500" : viewingUser.status === 'away' ? "bg-amber-500" : "bg-vox-muted"
                     )} />
                   </div>
-                  <button onClick={() => setViewingUser(null)} className="p-2 hover:bg-slate-100 rounded-full transition-all mb-4">
+                  <button onClick={() => setViewingUser(null)} className="p-2 hover:bg-vox-bg rounded-full transition-all mb-4">
                     <X size={20} />
                   </button>
                 </div>
@@ -1175,7 +1175,7 @@ export function ChatInterface({
                   </div>
 
                   {viewingUser.bio && (
-                    <div className="bg-slate-50 p-4 rounded-2xl border border-vox-border">
+                    <div className="bg-vox-bg p-4 rounded-2xl border border-vox-border">
                       <p className="text-xs leading-relaxed text-vox-text font-medium">{viewingUser.bio}</p>
                     </div>
                   )}
@@ -1187,7 +1187,7 @@ export function ChatInterface({
                           onSwitchPrivateChat(viewingUser.username);
                           setViewingUser(null);
                         }}
-                        className="flex-1 bg-vox-primary text-white py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2"
+                        className="flex-1 bg-vox-primary text-white py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-vox-primary-hover transition-all"
                       >
                         <MessageSquare size={16} />
                         Message
@@ -1199,7 +1199,7 @@ export function ChatInterface({
                           onSendFriendRequest(viewingUser.username);
                           alert("Demande d'ami envoyée !");
                         }}
-                        className="flex-1 bg-slate-100 text-vox-text py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-200 transition-all"
+                        className="flex-1 bg-vox-bg text-vox-text py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-vox-sidebar transition-all border border-vox-border"
                       >
                         <UserPlus size={16} />
                         Ajouter
@@ -1213,7 +1213,7 @@ export function ChatInterface({
                         setSelectedUser(viewingUser);
                         setViewingUser(null);
                       }}
-                      className="w-full mt-2 bg-vox-accent/5 text-vox-accent py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-vox-accent hover:text-white transition-all"
+                      className="w-full mt-2 bg-vox-accent/10 text-vox-accent py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-vox-accent hover:text-white transition-all"
                     >
                       <ShieldAlert size={16} />
                       Modération
@@ -1227,12 +1227,12 @@ export function ChatInterface({
       </AnimatePresence>
       <AnimatePresence>
         {showCreateServerModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 40 }}
-              className="w-full max-w-md bg-white p-10 rounded-[3rem] border border-vox-border shadow-2xl relative overflow-hidden"
+              className="w-full max-w-md bg-vox-surface p-10 rounded-[3rem] border border-vox-border shadow-2xl relative overflow-hidden"
             >
               <div className="absolute top-0 left-0 w-full h-2 bg-vox-primary" />
               
@@ -1249,7 +1249,7 @@ export function ChatInterface({
                     value={newServerName}
                     onChange={(e) => setNewServerName(e.target.value)}
                     placeholder="Ex: La Famille, Les Amis..."
-                    className="w-full bg-slate-50 border border-vox-border rounded-[1.5rem] px-6 py-5 text-vox-text font-bold outline-none focus:ring-4 focus:ring-vox-primary/5 focus:border-vox-primary transition-all"
+                    className="w-full bg-vox-bg border border-vox-border rounded-[1.5rem] px-6 py-5 text-vox-text font-bold outline-none focus:ring-4 focus:ring-vox-primary/5 focus:border-vox-primary transition-all"
                     autoFocus
                   />
                 </div>
@@ -1257,14 +1257,14 @@ export function ChatInterface({
                 <div className="flex gap-4 pt-4">
                   <button 
                     onClick={() => setShowCreateServerModal(false)}
-                    className="flex-1 py-5 px-4 bg-slate-50 text-vox-muted rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-all"
+                    className="flex-1 py-5 px-4 bg-vox-bg text-vox-muted rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-vox-sidebar transition-all border border-vox-border"
                   >
                     Annuler
                   </button>
                   <button 
                     onClick={handleCreateServer}
                     disabled={!newServerName.trim()}
-                    className="flex-1 py-5 px-4 bg-vox-primary text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-vox-primary-hover hover:-translate-y-1 active:translate-y-0 shadow-xl shadow-indigo-200 transition-all disabled:opacity-50 disabled:hover:translate-y-0"
+                    className="flex-1 py-5 px-4 bg-vox-primary text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-vox-primary-hover hover:-translate-y-1 active:translate-y-0 shadow-xl shadow-vox-primary/20 transition-all disabled:opacity-50 disabled:hover:translate-y-0"
                   >
                     Créer l'espace
                   </button>
@@ -1278,12 +1278,12 @@ export function ChatInterface({
       {/* Invite Modal */}
       <AnimatePresence>
         {showInviteModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 40 }}
-              className="w-full max-w-md bg-white p-10 rounded-[3rem] border border-vox-border shadow-2xl relative overflow-hidden"
+              className="w-full max-w-md bg-vox-surface p-10 rounded-[3rem] border border-vox-border shadow-2xl relative overflow-hidden"
             >
               <div className="absolute top-0 left-0 w-full h-2 bg-vox-primary" />
               
@@ -1300,7 +1300,7 @@ export function ChatInterface({
                     value={inviteTarget}
                     onChange={(e) => setInviteTarget(e.target.value)}
                     placeholder="Ex: JeanDupont"
-                    className="w-full bg-slate-50 border border-vox-border rounded-[1.5rem] px-6 py-5 text-vox-text font-bold outline-none focus:ring-4 focus:ring-vox-primary/5 focus:border-vox-primary transition-all"
+                    className="w-full bg-vox-bg border border-vox-border rounded-[1.5rem] px-6 py-5 text-vox-text font-bold outline-none focus:ring-4 focus:ring-vox-primary/5 focus:border-vox-primary transition-all"
                     autoFocus
                   />
                 </div>
@@ -1308,14 +1308,14 @@ export function ChatInterface({
                 <div className="flex gap-4 pt-4">
                   <button 
                     onClick={() => setShowInviteModal(false)}
-                    className="flex-1 py-5 px-4 bg-slate-50 text-vox-muted rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-all"
+                    className="flex-1 py-5 px-4 bg-vox-bg text-vox-muted rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-vox-sidebar transition-all border border-vox-border"
                   >
                     Annuler
                   </button>
                   <button 
                     onClick={handleInvite}
                     disabled={!inviteTarget.trim()}
-                    className="flex-1 py-5 px-4 bg-vox-primary text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-vox-primary-hover hover:-translate-y-1 active:translate-y-0 shadow-xl shadow-indigo-200 transition-all disabled:opacity-50 disabled:hover:translate-y-0"
+                    className="flex-1 py-5 px-4 bg-vox-primary text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-vox-primary-hover hover:-translate-y-1 active:translate-y-0 shadow-xl shadow-vox-primary/20 transition-all disabled:opacity-50 disabled:hover:translate-y-0"
                   >
                     Envoyer
                   </button>
