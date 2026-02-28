@@ -136,9 +136,22 @@ async function initDb() {
 
   if (isPostgres) {
     await db.query(schema.replace(/INTEGER PRIMARY KEY AUTOINCREMENT/g, 'SERIAL PRIMARY KEY'));
+    // Migrations for PostgreSQL
+    try { await db.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT;"); } catch (e) {}
+    try { await db.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT;"); } catch (e) {}
+    try { await db.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;"); } catch (e) {}
+    try { await db.query("ALTER TABLE channels ADD COLUMN IF NOT EXISTS server_id TEXT;"); } catch (e) {}
+    try { await db.query("ALTER TABLE channels ADD COLUMN IF NOT EXISTS locked BOOLEAN DEFAULT false;"); } catch (e) {}
+    try { await db.query("ALTER TABLE channels ADD COLUMN IF NOT EXISTS lock_message TEXT DEFAULT 'Ce salon est verrouillé.';"); } catch (e) {}
   } else {
     db.exec(schema.replace(/SERIAL PRIMARY KEY/g, 'INTEGER PRIMARY KEY AUTOINCREMENT'));
+    // Migrations for SQLite
     try { db.exec("ALTER TABLE channels ADD COLUMN server_id TEXT;"); } catch (e) {}
+    try { db.exec("ALTER TABLE channels ADD COLUMN locked BOOLEAN DEFAULT 0;"); } catch (e) {}
+    try { db.exec("ALTER TABLE channels ADD COLUMN lock_message TEXT DEFAULT 'Ce salon est verrouillé.';"); } catch (e) {}
+    try { db.exec("ALTER TABLE users ADD COLUMN display_name TEXT;"); } catch (e) {}
+    try { db.exec("ALTER TABLE users ADD COLUMN avatar TEXT;"); } catch (e) {}
+    try { db.exec("ALTER TABLE users ADD COLUMN bio TEXT;"); } catch (e) {}
   }
 
   await execute("INSERT INTO servers (id, name, owner, timestamp) VALUES ('fitcord-global', 'FitCord Global', 'system', '2026-02-27T00:00:00.000Z') ON CONFLICT DO NOTHING");
