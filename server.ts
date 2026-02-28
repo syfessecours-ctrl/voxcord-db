@@ -143,25 +143,34 @@ async function initDb() {
 const OWNER_USERNAME = "Vdw6200";
 
 async function startServer() {
-  const app = express();
-  const httpServer = createServer(app);
-  const io = new Server(httpServer, {
-    maxHttpBufferSize: 1e7,
-    cors: { origin: "*" }
-  });
+  try {
+    const app = express();
+    const httpServer = createServer(app);
+    const io = new Server(httpServer, {
+      maxHttpBufferSize: 1e7,
+      cors: { origin: "*" }
+    });
 
-  const PORT = 3000;
-  await initDb();
+    const PORT = 3000;
+    console.log("[SERVER] Initializing database...");
+    await initDb();
+    console.log("[SERVER] Database initialized successfully.");
 
-  // Health check endpoint for Render keep-alive
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
-  });
+    // Health check endpoint for Render keep-alive
+    app.get("/api/health", (req, res) => {
+      res.json({ status: "ok", timestamp: new Date().toISOString() });
+    });
 
   const users = new Map(); // socket.id -> user info
 
   const broadcastUserList = async () => {
-    const allUsers = Array.from(users.values());
+    // Get unique users by username to avoid duplicates
+    const uniqueUsersMap = new Map();
+    for (const u of users.values()) {
+      uniqueUsersMap.set(u.username, u);
+    }
+    const allUsers = Array.from(uniqueUsersMap.values());
+
     for (const [sid, u] of users.entries()) {
       if (u.role === 'owner' || u.role === 'moderator') {
         io.to(sid).emit("user_list", allUsers);
@@ -250,31 +259,40 @@ async function startServer() {
         return;
       }
 
+      // Check if user already owns a server (limit 1 for free tier)
       const existing = await getOne("SELECT * FROM servers WHERE owner = ?", [user.username]);
-      if (existing) {
+      if (existing && user.role !== 'owner') {
         console.log(`[Server] User ${user.username} already owns a server: ${existing.id}`);
         return socket.emit("error", "Vous ne pouvez créer qu'un seul serveur.");
       }
 
       const serverId = `srv-${Math.random().toString(36).substr(2, 9)}`;
       const timestamp = new Date().toISOString();
-      await execute("INSERT INTO servers (id, name, owner, timestamp) VALUES (?, ?, ?, ?)", [serverId, name, user.username, timestamp]);
-      await execute("INSERT INTO server_members (server_id, username, timestamp) VALUES (?, ?, ?)", [serverId, user.username, timestamp]);
-
-      // Create default channels for the new server
-      const textChannelId = `ch-${Math.random().toString(36).substr(2, 9)}`;
-      await execute("INSERT INTO channels (id, name, type, server_id) VALUES (?, ?, ?, ?)", [textChannelId, "général", "text", serverId]);
       
-      const voiceChannelId = `vc-${Math.random().toString(36).substr(2, 9)}`;
-      await execute("INSERT INTO channels (id, name, type, server_id) VALUES (?, ?, ?, ?)", [voiceChannelId, "Salon Vocal", "voice", serverId]);
+      try {
+        await execute("INSERT INTO servers (id, name, owner, timestamp) VALUES (?, ?, ?, ?)", [serverId, name, user.username, timestamp]);
+        await execute("INSERT INTO server_members (server_id, username, timestamp) VALUES (?, ?, ?)", [serverId, user.username, timestamp]);
 
-      const userServers = await query(`
-        SELECT s.* FROM servers s
-        JOIN server_members sm ON s.id = sm.server_id
-        WHERE sm.username = ?
-      `, [user.username]);
-      console.log(`[Server] Sending updated server list to ${user.username}:`, userServers.length, "servers");
-      socket.emit("server_list", userServers);
+        // Create default channels for the new server
+        const textChannelId = `ch-${Math.random().toString(36).substr(2, 9)}`;
+        await execute("INSERT INTO channels (id, name, type, server_id) VALUES (?, ?, ?, ?)", [textChannelId, "général", "text", serverId]);
+        
+        const voiceChannelId = `vc-${Math.random().toString(36).substr(2, 9)}`;
+        await execute("INSERT INTO channels (id, name, type, server_id) VALUES (?, ?, ?, ?)", [voiceChannelId, "Salon Vocal", "voice", serverId]);
+
+        const userServers = await query(`
+          SELECT s.* FROM servers s
+          JOIN server_members sm ON s.id = sm.server_id
+          WHERE sm.username = ?
+        `, [user.username]);
+        
+        console.log(`[Server] Sending updated server list to ${user.username}:`, userServers.length, "servers");
+        socket.emit("server_list", userServers);
+        socket.emit("server_created", { id: serverId, name });
+      } catch (err) {
+        console.error("[SERVER_ERROR] Failed to create server:", err);
+        socket.emit("error", "Erreur lors de la création du serveur.");
+      }
     });
 
     socket.on("get_server_channels", async (serverId) => {
@@ -575,6 +593,10 @@ async function startServer() {
       broadcastUserList();
     }, 30000);
   });
+  } catch (error) {
+    console.error("[SERVER_FATAL] Error during startup:", error);
+    process.exit(1);
+  }
 }
 
 startServer();
