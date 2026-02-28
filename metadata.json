@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Remix: VoxCord",
+  "description": "Une application de communication en temps réel inspirée de Discord avec chat et appels voix/vidéo.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
