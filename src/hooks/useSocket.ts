@@ -145,8 +145,8 @@ export function useSocket(username: string) {
     newSocket.on('server_deleted', (serverId) => {
       setServers(prev => prev.filter(s => s.id !== serverId));
       if (activeServer === serverId) {
-        setActiveServer('voxcord-global');
-        newSocket.emit('get_server_channels', 'voxcord-global');
+        setActiveServer('fitcord-global');
+        newSocket.emit('get_server_channels', 'fitcord-global');
       }
     });
 

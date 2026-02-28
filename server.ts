@@ -141,8 +141,8 @@ async function initDb() {
     try { db.exec("ALTER TABLE channels ADD COLUMN server_id TEXT;"); } catch (e) {}
   }
 
-  await execute("INSERT INTO servers (id, name, owner, timestamp) VALUES ('voxcord-global', 'VoxCord Global', 'system', '2026-02-27T00:00:00.000Z') ON CONFLICT DO NOTHING");
-  await execute("INSERT INTO channels (id, name, type, server_id) VALUES ('general', 'général', 'text', 'voxcord-global') ON CONFLICT DO NOTHING");
+  await execute("INSERT INTO servers (id, name, owner, timestamp) VALUES ('fitcord-global', 'FitCord Global', 'system', '2026-02-27T00:00:00.000Z') ON CONFLICT DO NOTHING");
+  await execute("INSERT INTO channels (id, name, type, server_id) VALUES ('general', 'général', 'text', 'fitcord-global') ON CONFLICT DO NOTHING");
 }
 
 const OWNER_USERNAME = "Vdw6200";
@@ -252,7 +252,7 @@ async function startServer() {
       });
       
       // Auto-join global server members if not already
-      await execute("INSERT INTO server_members (server_id, username, timestamp) VALUES (?, ?, ?) ON CONFLICT DO NOTHING", ['voxcord-global', username, new Date().toISOString()]);
+      await execute("INSERT INTO server_members (server_id, username, timestamp) VALUES (?, ?, ?) ON CONFLICT DO NOTHING", ['fitcord-global', username, new Date().toISOString()]);
 
       const userServers = await query(
         userRecord.role === 'owner' 
@@ -735,13 +735,15 @@ async function startServer() {
       
       const userServers = await query("SELECT * FROM servers");
       socket.emit("server_list", userServers);
+      const members = await query("SELECT username FROM server_members WHERE server_id = ?", [serverId]);
+      socket.emit("server_members", { serverId, members: members.map((m: any) => m.username) });
       await broadcastUserList();
     });
 
     socket.on("mod_delete_server", async (serverId) => {
       const admin = users.get(socket.id);
       if (!admin || admin.role !== 'owner') return;
-      if (serverId === 'voxcord-global') return socket.emit("error", "Impossible de supprimer le serveur global.");
+      if (serverId === 'fitcord-global') return socket.emit("error", "Impossible de supprimer le serveur global.");
 
       await execute("DELETE FROM messages WHERE channel_id IN (SELECT id FROM channels WHERE server_id = ?)", [serverId]);
       await execute("DELETE FROM channels WHERE server_id = ?", [serverId]);

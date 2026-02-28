@@ -1,6 +1,6 @@
 {
-  "name": "Remix: VoxCord",
-  "description": "Une application de communication en temps réel inspirée de Discord avec chat et appels voix/vidéo.",
+  "name": "FitCord",
+  "description": "Une application de communication en temps réel axée sur le fitness, inspirée de Discord.",
   "requestFramePermissions": [
     "camera",
     "microphone"

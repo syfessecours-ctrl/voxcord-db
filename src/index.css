@@ -5,20 +5,20 @@
   --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
-  --color-vox-bg: #2D2A32;
-  --color-vox-surface: #3B3842;
-  --color-vox-sidebar: #232127;
-  --color-vox-border: rgba(255, 255, 255, 0.06);
-  --color-vox-primary: #8B5CF6;
-  --color-vox-primary-hover: #7C3AED;
-  --color-vox-accent: #F43F5E;
-  --color-vox-text: #F2F3F5;
-  --color-vox-muted: #A1A1AA;
+  --color-fit-bg: #2D2A32;
+  --color-fit-surface: #3B3842;
+  --color-fit-sidebar: #232127;
+  --color-fit-border: rgba(255, 255, 255, 0.06);
+  --color-fit-primary: #8B5CF6;
+  --color-fit-primary-hover: #7C3AED;
+  --color-fit-accent: #F43F5E;
+  --color-fit-text: #F2F3F5;
+  --color-fit-muted: #A1A1AA;
 }
 
 @layer base {
   body {
-    @apply bg-vox-bg text-vox-text antialiased overflow-hidden;
+    @apply bg-fit-bg text-fit-text antialiased overflow-hidden;
     font-family: var(--font-sans);
   }
 }
