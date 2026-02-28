@@ -162,6 +162,7 @@ async function startServer() {
     });
 
   const users = new Map(); // socket.id -> user info
+  const voiceStates = new Map(); // channelId -> Set of { sid, username }
 
   const broadcastUserList = async () => {
     // Get unique users by username to avoid duplicates
@@ -255,6 +256,11 @@ async function startServer() {
       const requests = await query("SELECT * FROM friend_requests WHERE to_user = ? AND status = 'pending'", [username]);
       socket.emit("friend_requests", requests);
 
+      // Send initial voice states
+      for (const [channelId, userSet] of voiceStates.entries()) {
+        socket.emit("voice_state_update", { channelId, users: Array.from(userSet) });
+      }
+
       await broadcastUserList();
       
       // Notify friends that this user is online
@@ -330,21 +336,35 @@ async function startServer() {
       if (user.currentVoiceChannel && user.currentVoiceChannel !== channelId) {
         const oldChannelId = user.currentVoiceChannel;
         socket.leave(`voice:${oldChannelId}`);
-        socket.to(`voice:${oldChannelId}`).emit("user_left_voice", socket.id);
+        
+        const oldSet = voiceStates.get(oldChannelId);
+        if (oldSet) {
+          Array.from(oldSet).forEach((u: any) => {
+            if (u.sid === socket.id) oldSet.delete(u);
+          });
+          io.emit("voice_state_update", { channelId: oldChannelId, users: Array.from(oldSet) });
+        }
       }
       
       socket.join(`voice:${channelId}`);
       user.currentVoiceChannel = channelId;
       
-      // Notify others in the voice channel
-      const others = Array.from(users.entries())
-        .filter(([sid, u]) => u.currentVoiceChannel === channelId && sid !== socket.id)
-        .map(([sid, u]) => ({ sid, username: u.username }));
+      if (!voiceStates.has(channelId)) {
+        voiceStates.set(channelId, new Set());
+      }
+      const channelSet = voiceStates.get(channelId);
+      // Remove any existing entry for this sid to avoid duplicates
+      Array.from(channelSet).forEach((u: any) => {
+        if (u.sid === socket.id) channelSet.delete(u);
+      });
+      channelSet.add({ sid: socket.id, username: user.username });
       
-      console.log(`[Voice] Found ${others.length} other users in channel ${channelId}`);
+      const currentUsers = Array.from(channelSet);
+      io.emit("voice_state_update", { channelId, users: currentUsers });
       
+      // Still send the direct voice_users for the PeerJS logic
+      const others = currentUsers.filter((u: any) => u.sid !== socket.id);
       socket.emit("voice_users", others);
-      socket.to(`voice:${channelId}`).emit("user_joined_voice", { sid: socket.id, username: user.username });
     });
 
     socket.on("leave_voice", () => {
@@ -355,7 +375,13 @@ async function startServer() {
       socket.leave(`voice:${channelId}`);
       user.currentVoiceChannel = null;
       
-      socket.to(`voice:${channelId}`).emit("user_left_voice", socket.id);
+      const channelSet = voiceStates.get(channelId);
+      if (channelSet) {
+        Array.from(channelSet).forEach((u: any) => {
+          if (u.sid === socket.id) channelSet.delete(u);
+        });
+        io.emit("voice_state_update", { channelId, users: Array.from(channelSet) });
+      }
     });
 
     socket.on("voice_signal", ({ to, signal }) => {
@@ -596,7 +622,14 @@ async function startServer() {
         
         // Notify others in voice channel if user was in one
         if (user.currentVoiceChannel) {
-          socket.to(`voice:${user.currentVoiceChannel}`).emit("user_left_voice", socket.id);
+          const channelId = user.currentVoiceChannel;
+          const channelSet = voiceStates.get(channelId);
+          if (channelSet) {
+            Array.from(channelSet).forEach((u: any) => {
+              if (u.sid === socket.id) channelSet.delete(u);
+            });
+            io.emit("voice_state_update", { channelId, users: Array.from(channelSet) });
+          }
         }
 
         users.delete(socket.id);

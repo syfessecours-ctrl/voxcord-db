@@ -19,6 +19,7 @@ export default function App() {
     activePrivateChat,
     activeVoiceChannel,
     voiceUsers,
+    voiceStates,
     loginError,
     me,
     connect,
@@ -72,6 +73,7 @@ export default function App() {
       activePrivateChat={activePrivateChat}
       activeVoiceChannel={activeVoiceChannel}
       voiceUsers={voiceUsers}
+      voiceStates={voiceStates}
       onSendMessage={sendMessage}
       onSwitchChannel={switchChannel}
       onJoinVoice={joinVoice}

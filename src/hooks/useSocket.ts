@@ -17,6 +17,7 @@ export function useSocket(username: string) {
   const [activePrivateChat, setActivePrivateChat] = useState<string | null>(null);
   const [activeVoiceChannel, setActiveVoiceChannel] = useState<string | null>(null);
   const [voiceUsers, setVoiceUsers] = useState<{ sid: string, username: string }[]>([]);
+  const [voiceStates, setVoiceStates] = useState<Record<string, { sid: string, username: string }[]>>({});
   const [loginError, setLoginError] = useState<string | null>(null);
   const [me, setMe] = useState<{ username: string, role: string } | null>(null);
   
@@ -113,19 +114,13 @@ export function useSocket(username: string) {
     });
 
     newSocket.on('voice_users', (users) => {
-      console.log("[Socket] Received voice_users:", users);
+      console.log("[Socket] Received voice_users (direct):", users);
       setVoiceUsers(users);
     });
-    newSocket.on('user_joined_voice', (user) => {
-      console.log("[Socket] User joined voice:", user);
-      setVoiceUsers(prev => {
-        if (prev.find(u => u.sid === user.sid)) return prev;
-        return [...prev, user];
-      });
-    });
-    newSocket.on('user_left_voice', (sid) => {
-      console.log("[Socket] User left voice:", sid);
-      setVoiceUsers(prev => prev.filter(u => u.sid !== sid));
+    
+    newSocket.on('voice_state_update', ({ channelId, users }) => {
+      console.log(`[Socket] Voice state update for ${channelId}:`, users);
+      setVoiceStates(prev => ({ ...prev, [channelId]: users }));
     });
 
     newSocket.on('voice_signal', (data) => {
@@ -260,6 +255,7 @@ export function useSocket(username: string) {
     activePrivateChat,
     activeVoiceChannel,
     voiceUsers,
+    voiceStates,
     loginError,
     me,
     connect,

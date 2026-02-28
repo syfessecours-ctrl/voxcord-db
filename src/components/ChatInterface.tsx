@@ -42,6 +42,7 @@ interface ChatInterfaceProps {
   activePrivateChat: string | null;
   activeVoiceChannel: string | null;
   voiceUsers: { sid: string, username: string }[];
+  voiceStates: Record<string, { sid: string, username: string }[]>;
   onSendMessage: (text?: string, file?: string | ArrayBuffer | null) => void;
   onSwitchChannel: (id: string) => void;
   onJoinVoice: (id: string) => void;
@@ -77,6 +78,7 @@ export function ChatInterface({
   activePrivateChat,
   activeVoiceChannel,
   voiceUsers,
+  voiceStates,
   onSendMessage,
   onSwitchChannel,
   onJoinVoice,
@@ -226,7 +228,13 @@ export function ChatInterface({
 
   const startVoiceChat = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: false, // Disabling this to fix "rollercoaster" volume swings
+        } 
+      });
       myStreamRef.current = stream;
       
       const peer = new Peer({
@@ -430,19 +438,34 @@ export function ChatInterface({
                 <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Salons Textuels</div>
               </div>
               {channels.map(ch => (
-                <div 
-                  key={ch.id}
-                  onClick={() => {
-                    setShowFriendsView(false);
-                    onSwitchChannel(ch.id);
-                  }}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all font-bold",
-                    activeChannel === ch.id || activeVoiceChannel === ch.id ? "bg-white/10 text-white" : "hover:bg-white/5 hover:text-white"
+                <div key={ch.id}>
+                  <div 
+                    onClick={() => {
+                      setShowFriendsView(false);
+                      onSwitchChannel(ch.id);
+                    }}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all font-bold",
+                      activeChannel === ch.id || activeVoiceChannel === ch.id ? "bg-white/10 text-white" : "hover:bg-white/5 hover:text-white"
+                    )}
+                  >
+                    {ch.type === 'voice' ? <Volume2 size={18} className="text-gray-500" /> : <Hash size={18} className="text-gray-500" />}
+                    <span>{ch.name}</span>
+                  </div>
+                  
+                  {/* Global Voice Participants */}
+                  {ch.type === 'voice' && voiceStates[ch.id] && voiceStates[ch.id].length > 0 && (
+                    <div className="ml-9 mt-1 mb-2 space-y-1">
+                      {voiceStates[ch.id].map(vu => (
+                        <div key={vu.sid} className="flex items-center gap-2 py-0.5">
+                          <div className="w-5 h-5 bg-white/10 rounded-md flex items-center justify-center text-white text-[8px] font-bold">
+                            {vu.username[0].toUpperCase()}
+                          </div>
+                          <span className="text-[11px] font-medium text-gray-400">{vu.username}</span>
+                        </div>
+                      ))}
+                    </div>
                   )}
-                >
-                  {ch.type === 'voice' ? <Volume2 size={18} className="text-gray-500" /> : <Hash size={18} className="text-gray-500" />}
-                  <span>{ch.name}</span>
                 </div>
               ))}
 
