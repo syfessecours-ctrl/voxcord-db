@@ -277,6 +277,7 @@ export function useSocket(username: string) {
     if (socketRef.current && id !== activeChannel) {
       const channel = channels.find(c => c.id === id);
       if (channel?.type === 'voice') {
+        setActiveChannel(id); // Set activeChannel to show the voice UI
         joinVoice(id);
       } else {
         setActiveChannel(id);

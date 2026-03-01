@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Peer } from 'peerjs';
 import { 
@@ -144,6 +144,7 @@ export function ChatInterface({
   const [inviteTarget, setInviteTarget] = useState('');
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
   const [profileForm, setProfileForm] = useState({
     displayName: me?.displayName || '',
@@ -185,6 +186,14 @@ export function ChatInterface({
   const isMod = isOwner || me?.role === 'moderator';
 
   const currentPrivateMessages = activePrivateChat ? (privateMessages[activePrivateChat] || []) : [];
+  const groupedUsers = useMemo(() => {
+    return {
+      owner: users.filter(u => u.role === 'owner'),
+      moderator: users.filter(u => u.role === 'moderator'),
+      user: users.filter(u => u.role === 'user'),
+    };
+  }, [users]);
+
   const displayMessages = activePrivateChat ? currentPrivateMessages : messages;
 
   useEffect(() => {
@@ -208,7 +217,6 @@ export function ChatInterface({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const isVideo = file.type.startsWith('video/');
       const hasLargeVideoPermission = me?.canSendLargeVideos || isOwner;
       const maxSize = hasLargeVideoPermission ? 1024 * 1024 * 1024 : 50 * 1024 * 1024; // 1GB vs 50MB
       
@@ -218,17 +226,42 @@ export function ChatInterface({
       }
 
       setIsUploading(true);
-      const reader = new FileReader();
-      reader.onload = () => {
-        onSendMessage(undefined, reader.result);
-        setIsUploading(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
+      setUploadProgress(0);
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload', true);
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(percentComplete);
+        }
       };
-      reader.onerror = () => {
-        alert("Erreur lors de la lecture du fichier.");
-        setIsUploading(false);
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          const response = JSON.parse(xhr.responseText);
+          onSendMessage(undefined, response.url);
+          setIsUploading(false);
+          setUploadProgress(0);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        } else {
+          alert("Erreur lors de l'envoi du fichier.");
+          setIsUploading(false);
+          setUploadProgress(0);
+        }
       };
-      reader.readAsDataURL(file);
+
+      xhr.onerror = () => {
+        alert("Erreur réseau lors de l'envoi.");
+        setIsUploading(false);
+        setUploadProgress(0);
+      };
+
+      xhr.send(formData);
     }
   };
 
@@ -1185,7 +1218,10 @@ export function ChatInterface({
                         </div>
                       )}
                       {displayMessages.map((msg) => {
-                        const isMe = ((msg as any).user || (msg as any).from_user) === username;
+                        const msgUser = ((msg as any).user || (msg as any).from_user);
+                        const isMe = msgUser === username;
+                        const user = users.find(u => u.username === msgUser);
+                        
                         return (
                           <div key={msg.id} className={cn(
                             "flex gap-4 group relative max-w-[85%]",
@@ -1194,19 +1230,18 @@ export function ChatInterface({
                             <div 
                               className="w-10 h-10 bg-fit-surface border border-fit-border rounded-xl flex-shrink-0 flex items-center justify-center text-fit-muted font-black text-xs shadow-sm cursor-pointer overflow-hidden"
                               onClick={() => {
-                                const user = users.find(u => u.username === ((msg as any).user || (msg as any).from_user));
                                 if (user) setViewingUser(user);
                               }}
                             >
-                              {users.find(u => u.username === ((msg as any).user || (msg as any).from_user))?.avatar ? (
+                              {user?.avatar ? (
                                 <img 
-                                  src={users.find(u => u.username === ((msg as any).user || (msg as any).from_user))?.avatar} 
+                                  src={user.avatar} 
                                   alt="Avatar" 
                                   className="w-full h-full object-cover" 
                                   referrerPolicy="no-referrer"
                                 />
                               ) : (
-                                (msg as any).user ? (msg as any).user[0]?.toUpperCase() : (msg as any).from_user[0]?.toUpperCase()
+                                msgUser ? msgUser[0]?.toUpperCase() : '?'
                               )}
                             </div>
                             <div className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
@@ -1214,11 +1249,10 @@ export function ChatInterface({
                                 <span 
                                   className="font-black text-fit-text text-[11px] cursor-pointer hover:underline"
                                   onClick={() => {
-                                    const user = users.find(u => u.username === ((msg as any).user || (msg as any).from_user));
                                     if (user) setViewingUser(user);
                                   }}
                                 >
-                                  {users.find(u => u.username === ((msg as any).user || (msg as any).from_user))?.displayName || ((msg as any).user || (msg as any).from_user)}
+                                  {user?.displayName || msgUser}
                                 </span>
                                 <span className="text-[9px] text-fit-muted font-bold">
                                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -1230,10 +1264,10 @@ export function ChatInterface({
                               )}>
                                 {msg.text}
                                 {msg.file && (
-                                  <div className="mt-3 rounded-xl overflow-hidden border border-white/10 max-w-md">
-                                    {msg.file.startsWith('data:image') ? (
-                                      <img src={msg.file} alt="Upload" className="max-h-64 w-full object-cover" />
-                                    ) : msg.file.startsWith('data:video') ? (
+                                  <div className="mt-3 rounded-xl overflow-hidden border border-white/10 max-w-md shadow-lg">
+                                    {(msg.file.startsWith('data:image') || msg.file.match(/\.(jpg|jpeg|png|gif|webp)$/i) || msg.file.includes('/uploads/')) && !msg.file.match(/\.(mp4|webm|ogg|mov)$/i) ? (
+                                      <img src={msg.file} alt="Upload" className="max-h-64 w-full object-cover" referrerPolicy="no-referrer" />
+                                    ) : (msg.file.startsWith('data:video') || msg.file.match(/\.(mp4|webm|ogg|mov)$/i)) ? (
                                       <video 
                                         src={msg.file} 
                                         controls 
@@ -1241,9 +1275,14 @@ export function ChatInterface({
                                         preload="metadata"
                                       />
                                     ) : (
-                                      <div className="p-3 bg-white/5 flex items-center gap-3">
-                                        <ImageIcon size={20} />
-                                        <a href={msg.file} download="file" className="text-[10px] font-black uppercase tracking-widest hover:underline">Fichier</a>
+                                      <div className="p-4 bg-white/5 flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-xl bg-fit-primary/20 flex items-center justify-center text-fit-primary">
+                                          <ImageIcon size={20} />
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-[10px] font-black text-white uppercase tracking-widest mb-1">Fichier Partagé</span>
+                                          <a href={msg.file} download="file" className="text-[9px] font-bold text-fit-muted hover:text-white hover:underline transition-colors truncate max-w-[150px]">Télécharger</a>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -1269,6 +1308,25 @@ export function ChatInterface({
 
                   {/* Input Area */}
                   <div className="p-8 pt-0 relative z-10">
+                    {isUploading && (
+                      <div className="mb-4 px-4 py-3 bg-fit-surface rounded-2xl border border-fit-border shadow-lg animate-in fade-in slide-in-from-bottom-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-fit-primary rounded-full animate-pulse" />
+                            <span className="text-[10px] font-black text-fit-muted uppercase tracking-widest">Envoi en cours...</span>
+                          </div>
+                          <span className="text-[10px] font-black text-fit-primary">{uploadProgress}%</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-fit-border rounded-full overflow-hidden">
+                          <motion.div 
+                            className="h-full bg-fit-primary"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${uploadProgress}%` }}
+                            transition={{ type: "spring", bounce: 0, duration: 0.5 }}
+                          />
+                        </div>
+                      </div>
+                    )}
                     <div className="bg-fit-surface rounded-[2rem] border border-fit-border p-2 shadow-xl shadow-fit-primary/5 focus-within:border-fit-primary/50 transition-all">
                       <form 
                         onSubmit={handleSendMessage}
@@ -1337,7 +1395,7 @@ export function ChatInterface({
           <div className="flex-1 overflow-y-auto p-4 space-y-6 discord-scrollbar">
             {/* Grouped by Roles */}
             {['owner', 'moderator', 'user'].map(role => {
-              const roleUsers = users.filter(u => u.role === role);
+              const roleUsers = groupedUsers[role as keyof typeof groupedUsers];
               if (roleUsers.length === 0) return null;
               
               return (

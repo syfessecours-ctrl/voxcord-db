@@ -3,9 +3,11 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import { createServer as createViteServer } from "vite";
 import path from "path";
+import fs from "fs";
 import Database from "better-sqlite3";
 import bcrypt from "bcryptjs";
 import pg from "pg";
+import multer from "multer";
 const { Pool } = pg;
 
 // Database abstraction to support both SQLite and PostgreSQL
@@ -225,6 +227,35 @@ async function startServer() {
     // Health check endpoint for Render keep-alive
     app.get("/api/health", (req, res) => {
       res.json({ status: "ok", timestamp: new Date().toISOString() });
+    });
+
+    // File Upload Setup
+    const uploadDir = path.join(process.cwd(), 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const storage = multer.diskStorage({
+      destination: (req, file, cb) => {
+        cb(null, 'uploads/');
+      },
+      filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + '-' + file.originalname);
+      }
+    });
+
+    const upload = multer({ 
+      storage: storage,
+      limits: { fileSize: 1024 * 1024 * 1024 } // 1GB
+    });
+
+    app.use('/uploads', express.static('uploads'));
+
+    app.post('/api/upload', upload.single('file'), (req: any, res) => {
+      if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+      const fileUrl = `/uploads/${req.file.filename}`;
+      res.json({ url: fileUrl });
     });
 
   const users = new Map(); // socket.id -> user info
