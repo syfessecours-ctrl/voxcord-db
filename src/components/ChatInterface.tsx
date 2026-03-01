@@ -29,7 +29,9 @@ import {
   Settings,
   Camera,
   Video,
-  Monitor
+  Monitor,
+  Minimize2,
+  Maximize2
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { User, Channel, Message, Friend, FriendRequest, PrivateMessage, Server as ServerType } from '../types';
@@ -221,7 +223,8 @@ export function ChatInterface({
     displayName?: string;
     avatar?: string;
     banner?: string;
-  }>({ status: 'idle', otherUser: '' });
+    isMinimized?: boolean;
+  }>({ status: 'idle', otherUser: '', isMinimized: false });
 
   const privatePeerRef = useRef<Peer | null>(null);
   const privateMyStreamRef = useRef<MediaStream | null>(null);
@@ -664,7 +667,7 @@ export function ChatInterface({
   useEffect(() => {
     const handleIncoming = (e: any) => {
       const { from, peerId, displayName, avatar, banner } = e.detail;
-      setPrivateCall({ status: 'incoming', otherUser: from, peerId, displayName, avatar, banner });
+      setPrivateCall({ status: 'incoming', otherUser: from, peerId, displayName, avatar, banner, isMinimized: false });
       
       if (me?.callSoundsEnabled !== false) {
         const ringtone = me?.ringtoneUrl || appConfig.default_ringtone || 'https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3';
@@ -677,7 +680,7 @@ export function ChatInterface({
     const handleAccepted = async (e: any) => {
       const { from, peerId } = e.detail;
       if (privateCall.status === 'calling' && privateCall.otherUser === from) {
-        setPrivateCall(prev => ({ ...prev, status: 'active', peerId }));
+        setPrivateCall(prev => ({ ...prev, status: 'active', peerId, isMinimized: true }));
         
         // Stop calling sound if we had one (optional)
         if (ringtoneRef.current) {
@@ -745,7 +748,7 @@ export function ChatInterface({
     }
     privateRemoteStreamRef.current = null;
     setPrivateRemoteStream(null);
-    setPrivateCall({ status: 'idle', otherUser: '' });
+    setPrivateCall({ status: 'idle', otherUser: '', isMinimized: false });
   };
 
   const startPrivateCall = async (targetUsername: string) => {
@@ -771,7 +774,8 @@ export function ChatInterface({
           otherUser: targetUsername,
           displayName: targetUser?.displayName,
           avatar: targetUser?.avatar,
-          banner: targetUser?.banner
+          banner: targetUser?.banner,
+          isMinimized: false
         });
         onInitPrivateCall(targetUsername, id);
       });
@@ -820,7 +824,7 @@ export function ChatInterface({
       privatePeerRef.current = peer;
 
       peer.on('open', (id) => {
-        setPrivateCall(prev => ({ ...prev, status: 'active' }));
+        setPrivateCall(prev => ({ ...prev, status: 'active', isMinimized: true }));
         onAcceptPrivateCall(privateCall.otherUser, id);
       });
 
@@ -1299,6 +1303,11 @@ export function ChatInterface({
                         ) : (
                           <div className="w-8 h-8 bg-fit-surface rounded-xl flex items-center justify-center text-fit-muted font-bold text-[10px] border border-fit-border">
                             {f.username[0]?.toUpperCase()}
+                          </div>
+                        )}
+                        {privateCall.status !== 'idle' && privateCall.otherUser === f.username && (
+                          <div className="absolute -top-1 -right-1 bg-fit-primary text-white p-0.5 rounded-full shadow-lg animate-pulse z-10">
+                            <Video size={8} />
                           </div>
                         )}
                         <div className={cn(
@@ -3190,89 +3199,153 @@ export function ChatInterface({
       {/* Private Call Screens */}
       <AnimatePresence>
         {privateCall.status !== 'idle' && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className={cn(
+            "fixed z-[300] transition-all duration-500",
+            privateCall.isMinimized 
+              ? "bottom-6 right-6 w-16 h-16" 
+              : "inset-0 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          )}>
             <motion.div 
+              layout
               initial={{ opacity: 0, scale: 0.8, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: 20 }}
-              className="w-full max-w-md bg-fit-surface border border-fit-border rounded-[2.5rem] shadow-2xl overflow-hidden relative"
+              className={cn(
+                "bg-fit-surface border border-fit-border shadow-2xl overflow-hidden relative transition-all duration-500",
+                privateCall.isMinimized 
+                  ? "w-16 h-16 rounded-full cursor-pointer hover:scale-110 active:scale-95" 
+                  : "w-full max-w-md rounded-[2.5rem]"
+              )}
+              onClick={() => {
+                if (privateCall.isMinimized) {
+                  setPrivateCall(prev => ({ ...prev, isMinimized: false }));
+                }
+              }}
             >
-              {/* Call Banner */}
-              <div className="h-40 w-full relative overflow-hidden">
-                {privateCall.banner || appConfig.default_call_banner ? (
-                  <img src={privateCall.banner || appConfig.default_call_banner} alt="Banner" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-fit-primary to-fit-accent opacity-20" />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-fit-surface to-transparent" />
-              </div>
-
-              <div className="px-8 pb-10 -mt-12 relative flex flex-col items-center text-center">
-                {/* Avatar */}
-                <div className="relative mb-4">
-                  <div className="w-24 h-24 rounded-[2rem] bg-fit-bg border-4 border-fit-surface shadow-2xl overflow-hidden flex items-center justify-center text-fit-muted font-black text-3xl">
-                    {privateCall.avatar ? (
-                      <img src={privateCall.avatar} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      privateCall.otherUser[0]?.toUpperCase()
-                    )}
-                  </div>
-                  {privateCall.status === 'active' && (
-                    <div className="absolute -bottom-1 -right-1 bg-emerald-500 w-6 h-6 rounded-full border-2 border-fit-surface flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
-                    </div>
-                  )}
-                </div>
-
-                <h2 className="text-2xl font-black text-fit-text tracking-tighter mb-1">
-                  {privateCall.displayName || privateCall.otherUser}
-                </h2>
-                
-                <div className="mb-8">
-                  {privateCall.status === 'calling' && (
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-fit-primary font-black text-[10px] uppercase tracking-[0.3em] animate-pulse">Appel en cours...</span>
-                    </div>
-                  )}
-                  {privateCall.status === 'incoming' && (
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-fit-accent font-black text-[10px] uppercase tracking-[0.3em] animate-bounce">Appel entrant</span>
-                    </div>
-                  )}
-                  {privateCall.status === 'active' && (
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-emerald-500 font-black text-[10px] uppercase tracking-[0.3em]">En communication</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Call Actions */}
-                <div className="flex items-center gap-4">
-                  {privateCall.status === 'incoming' ? (
-                    <>
-                      <button 
-                        onClick={rejectCall}
-                        className="w-14 h-14 bg-fit-accent text-white rounded-full flex items-center justify-center shadow-xl shadow-fit-accent/40 hover:scale-110 active:scale-95 transition-all"
-                      >
-                        <PhoneOff size={24} />
-                      </button>
-                      <button 
-                        onClick={acceptCall}
-                        className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-xl shadow-emerald-500/40 hover:scale-110 active:scale-95 transition-all"
-                      >
-                        <Video size={28} />
-                      </button>
-                    </>
+              {privateCall.isMinimized ? (
+                <div className="w-full h-full flex items-center justify-center bg-fit-primary text-white relative">
+                  {privateCall.avatar ? (
+                    <img src={privateCall.avatar} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   ) : (
-                    <button 
-                      onClick={endCall}
-                      className="w-16 h-16 bg-fit-accent text-white rounded-full flex items-center justify-center shadow-xl shadow-fit-accent/40 hover:scale-110 active:scale-95 transition-all"
-                    >
-                      <PhoneOff size={28} />
-                    </button>
+                    <Video size={24} />
                   )}
+                  <div className="absolute -top-1 -right-1 bg-emerald-500 w-4 h-4 rounded-full border-2 border-fit-surface animate-pulse" />
                 </div>
-              </div>
+              ) : (
+                <>
+                  {/* Call Background with Fade */}
+                  <div className="absolute inset-0 z-0">
+                    <AnimatePresence mode="wait">
+                      {privateCall.status === 'calling' || privateCall.status === 'incoming' ? (
+                        <motion.img
+                          key="calling-gif"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 0.4 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 1 }}
+                          src="https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJ6eW56eW56eW56eW56eW56eW56eW56eW56eW56eW56eW56JmVwPXYxX2ludGVybmFsX2dpZl9ieV9pZCZjdD1n/3o7TKMGpxxH6A5v7m8/giphy.gif"
+                          alt="Calling"
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        (privateCall.banner || appConfig.default_call_banner) && (
+                          <motion.img
+                            key="banner"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 0.6 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 1 }}
+                            src={privateCall.banner || appConfig.default_call_banner}
+                            alt="Background"
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        )
+                      )}
+                    </AnimatePresence>
+                    <div className="absolute inset-0 bg-gradient-to-b from-fit-surface/60 via-fit-surface/80 to-fit-surface" />
+                  </div>
+
+                  {/* Minimize Button */}
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPrivateCall(prev => ({ ...prev, isMinimized: true }));
+                    }}
+                    className="absolute top-6 right-6 z-20 w-10 h-10 bg-fit-surface/50 hover:bg-fit-surface text-fit-text rounded-full flex items-center justify-center backdrop-blur-md transition-all active:scale-90"
+                  >
+                    <Minimize2 size={18} />
+                  </button>
+
+                  <div className="px-8 pb-10 pt-16 relative z-10 flex flex-col items-center text-center">
+                    {/* Avatar */}
+                    <div className="relative mb-6">
+                      <div className="w-28 h-28 rounded-[2.5rem] bg-fit-bg border-4 border-fit-surface shadow-2xl overflow-hidden flex items-center justify-center text-fit-muted font-black text-4xl">
+                        {privateCall.avatar ? (
+                          <img src={privateCall.avatar} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          privateCall.otherUser[0]?.toUpperCase()
+                        )}
+                      </div>
+                      {privateCall.status === 'active' && (
+                        <div className="absolute -bottom-1 -right-1 bg-emerald-500 w-8 h-8 rounded-full border-4 border-fit-surface flex items-center justify-center">
+                          <div className="w-2 h-2 bg-white rounded-full animate-ping" />
+                        </div>
+                      )}
+                    </div>
+
+                    <h2 className="text-3xl font-black text-fit-text tracking-tighter mb-1">
+                      {privateCall.displayName || privateCall.otherUser}
+                    </h2>
+                    
+                    <div className="mb-10">
+                      {privateCall.status === 'calling' && (
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-fit-primary font-black text-[10px] uppercase tracking-[0.4em] animate-pulse">Appel en cours...</span>
+                        </div>
+                      )}
+                      {privateCall.status === 'incoming' && (
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-fit-accent font-black text-[10px] uppercase tracking-[0.4em] animate-bounce">Appel entrant</span>
+                        </div>
+                      )}
+                      {privateCall.status === 'active' && (
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-emerald-500 font-black text-[10px] uppercase tracking-[0.4em]">En communication</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Call Actions */}
+                    <div className="flex items-center gap-6">
+                      {privateCall.status === 'incoming' ? (
+                        <>
+                          <button 
+                            onClick={rejectCall}
+                            className="w-16 h-16 bg-fit-accent text-white rounded-full flex items-center justify-center shadow-xl shadow-fit-accent/40 hover:scale-110 active:scale-95 transition-all"
+                          >
+                            <PhoneOff size={28} />
+                          </button>
+                          <button 
+                            onClick={acceptCall}
+                            className="w-20 h-20 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-xl shadow-emerald-500/40 hover:scale-110 active:scale-95 transition-all"
+                          >
+                            <Video size={32} />
+                          </button>
+                        </>
+                      ) : (
+                        <button 
+                          onClick={endCall}
+                          className="w-20 h-20 bg-fit-accent text-white rounded-full flex items-center justify-center shadow-xl shadow-fit-accent/40 hover:scale-110 active:scale-95 transition-all"
+                        >
+                          <PhoneOff size={32} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Hidden audio for remote stream */}
               {privateRemoteStream && (
