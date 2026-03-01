@@ -174,6 +174,8 @@ export function useSocket(username: string) {
 
   const switchServer = (serverId: string | null) => {
     setActiveServer(serverId);
+    setActiveChannel('');
+    setMessages([]);
     if (serverId) {
       socketRef.current?.emit('get_server_channels', serverId);
     } else {

@@ -27,7 +27,8 @@ import {
   PhoneOff,
   Settings,
   Camera,
-  Video
+  Video,
+  Monitor
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { User, Channel, Message, Friend, FriendRequest, PrivateMessage, Server as ServerType } from '../types';
@@ -142,6 +143,7 @@ export function ChatInterface({
   const [lockMessage, setLockMessage] = useState('Seul les modérateurs peuvent écrire ici');
   const [inviteTarget, setInviteTarget] = useState('');
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
   const [profileForm, setProfileForm] = useState({
     displayName: me?.displayName || '',
@@ -149,6 +151,7 @@ export function ChatInterface({
     bio: me?.bio || ''
   });
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const peerRef = useRef<Peer | null>(null);
   const myStreamRef = useRef<MediaStream | null>(null);
   const callsRef = useRef<Record<string, any>>({});
@@ -207,16 +210,23 @@ export function ChatInterface({
     if (file) {
       const isVideo = file.type.startsWith('video/');
       const hasLargeVideoPermission = me?.canSendLargeVideos || isOwner;
-      const maxSize = hasLargeVideoPermission ? 500 * 1024 * 1024 : 50 * 1024 * 1024; // 500MB vs 50MB
+      const maxSize = hasLargeVideoPermission ? 1024 * 1024 * 1024 : 50 * 1024 * 1024; // 1GB vs 50MB
       
       if (file.size > maxSize) {
-        alert(`Fichier trop volumineux ! Limite : ${hasLargeVideoPermission ? '500 Mo' : '50 Mo'}.`);
+        alert(`Fichier trop volumineux ! Limite : ${hasLargeVideoPermission ? '1 Go' : '50 Mo'}.`);
         return;
       }
 
+      setIsUploading(true);
       const reader = new FileReader();
       reader.onload = () => {
         onSendMessage(undefined, reader.result);
+        setIsUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      };
+      reader.onerror = () => {
+        alert("Erreur lors de la lecture du fichier.");
+        setIsUploading(false);
       };
       reader.readAsDataURL(file);
     }
@@ -942,78 +952,205 @@ export function ChatInterface({
 
               {/* Main Content Area */}
               {currentChannel?.type === 'voice' ? (
-                <div className="flex-1 flex flex-col bg-fit-bg relative overflow-hidden">
-                  {/* Voice Room Header */}
-                  <div className="flex-1 p-8 flex flex-col items-center justify-center">
-                    <div className="w-full max-w-5xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="flex-1 flex flex-col relative overflow-hidden bg-[#060606]">
+                  {/* Atmospheric Background Layer */}
+                  <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute inset-0 bg-gradient-to-b from-fit-primary/5 to-transparent opacity-30" />
+                    <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-fit-primary/10 rounded-full blur-[150px] animate-pulse" />
+                    <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500/5 rounded-full blur-[150px] animate-pulse delay-1000" />
+                  </div>
+
+                  {/* Voice Room Header Bar */}
+                  <div className="h-20 px-8 flex items-center justify-between border-b border-white/5 bg-white/[0.02] backdrop-blur-xl relative z-20">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-fit-primary/10 flex items-center justify-center text-fit-primary border border-fit-primary/20 shadow-inner">
+                        <Volume2 size={24} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <h3 className="font-black text-white text-sm uppercase tracking-[0.2em]">{currentChannel?.name}</h3>
+                          <div className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
+                            <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Live</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                          <p className="text-[10px] text-fit-muted font-bold uppercase tracking-tight">RTC Connecté • {voiceStates[activeChannel]?.length || 0} participants</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                      <div className="flex -space-x-3">
+                        {voiceStates[activeChannel]?.slice(0, 5).map((vu) => {
+                          const user = users.find(u => u.username === vu.username);
+                          return (
+                            <div key={vu.sid} className="w-10 h-10 rounded-full border-4 border-[#060606] bg-fit-surface overflow-hidden shadow-xl">
+                              {user?.avatar ? (
+                                <img src={user.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-xs font-black text-fit-muted">
+                                  {vu.username[0].toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {(voiceStates[activeChannel]?.length || 0) > 5 && (
+                          <div className="w-10 h-10 rounded-full border-4 border-[#060606] bg-fit-surface flex items-center justify-center text-[10px] font-black text-white shadow-xl">
+                            +{(voiceStates[activeChannel]?.length || 0) - 5}
+                          </div>
+                        )}
+                      </div>
+                      <button className="p-3 text-fit-muted hover:text-white transition-colors">
+                        <Users size={20} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Voice Room Grid */}
+                  <div className="flex-1 p-8 flex flex-col items-center justify-center relative z-10 overflow-y-auto discord-scrollbar">
+                    <div className={cn(
+                      "w-full max-w-7xl grid gap-8 transition-all duration-700 ease-out",
+                      voiceStates[activeChannel]?.length <= 1 ? "grid-cols-1 max-w-xl" :
+                      voiceStates[activeChannel]?.length <= 2 ? "grid-cols-1 md:grid-cols-2 max-w-4xl" :
+                      voiceStates[activeChannel]?.length <= 4 ? "grid-cols-1 sm:grid-cols-2 max-w-5xl" :
+                      "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                    )}>
                       {voiceStates[activeChannel]?.map(vu => {
                         const user = users.find(u => u.username === vu.username);
+                        const isMe = vu.username === username;
+                        
                         return (
                           <motion.div 
                             key={vu.sid}
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="aspect-square bg-fit-surface border border-fit-border rounded-[2.5rem] flex flex-col items-center justify-center p-6 relative group hover:border-fit-primary/50 transition-all shadow-xl"
+                            layout
+                            initial={{ scale: 0.8, opacity: 0, y: 30 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            className="aspect-video bg-white/[0.03] backdrop-blur-2xl border border-white/5 rounded-[2.5rem] flex flex-col items-center justify-center p-8 relative group hover:bg-white/[0.06] hover:border-white/10 transition-all duration-500 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] overflow-hidden"
                           >
-                            {/* Speaking Ring Animation */}
-                            <div className="absolute inset-4 rounded-[2rem] border-2 border-emerald-500/20 animate-ping opacity-20" />
+                            {/* Speaking Glow Effect (Atmospheric) */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-fit-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
                             
-                            <div className="relative mb-4">
-                              <div className="p-1 rounded-[2rem] bg-gradient-to-tr from-fit-primary to-emerald-400 shadow-lg">
+                            <div className="relative mb-8">
+                              <div className={cn(
+                                "p-1.5 rounded-[3rem] transition-all duration-700 shadow-2xl",
+                                "bg-gradient-to-tr from-fit-primary to-emerald-400 group-hover:scale-110 group-hover:rotate-3",
+                                "ring-8 ring-emerald-500/5 group-hover:ring-emerald-500/20"
+                              )}>
                                 {user?.avatar ? (
-                                  <img src={user.avatar} alt={vu.username} className="w-24 h-24 rounded-[1.8rem] object-cover bg-fit-bg" referrerPolicy="no-referrer" />
+                                  <img src={user.avatar} alt={vu.username} className="w-32 h-32 rounded-[2.6rem] object-cover bg-fit-bg" referrerPolicy="no-referrer" />
                                 ) : (
-                                  <div className="w-24 h-24 bg-fit-bg rounded-[1.8rem] flex items-center justify-center text-fit-muted font-black text-3xl">
+                                  <div className="w-32 h-32 bg-fit-bg rounded-[2.6rem] flex items-center justify-center text-fit-muted font-black text-5xl">
                                     {vu.username[0].toUpperCase()}
                                   </div>
                                 )}
                               </div>
-                              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full border-4 border-fit-surface flex items-center justify-center">
-                                <Mic size={10} className="text-white" />
+                              
+                              {/* Status Indicator Badge */}
+                              <div className={cn(
+                                "absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl border-4 border-[#060606] flex items-center justify-center shadow-2xl transition-all duration-500",
+                                isMe && isMuted ? "bg-fit-accent scale-110" : "bg-emerald-500 group-hover:scale-110"
+                              )}>
+                                {isMe && isMuted ? (
+                                  <MicOff size={18} className="text-white" />
+                                ) : (
+                                  <Mic size={18} className="text-white" />
+                                )}
                               </div>
                             </div>
                             
-                            <div className="text-center">
-                              <h4 className="font-black text-fit-text tracking-tight">{user?.displayName || vu.username}</h4>
-                              <p className="text-[10px] font-black text-fit-muted uppercase tracking-widest opacity-50">En ligne</p>
+                            <div className="text-center relative z-10">
+                              <h4 className="font-black text-white text-xl tracking-tight mb-2 group-hover:text-fit-primary transition-colors">{user?.displayName || vu.username}</h4>
+                              <div className="flex items-center justify-center gap-2 px-4 py-1.5 bg-white/5 rounded-full border border-white/5">
+                                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                                <p className="text-[9px] font-black text-white/50 uppercase tracking-[0.2em]">En ligne</p>
+                              </div>
                             </div>
 
-                            {/* Hover Overlay */}
-                            <div className="absolute inset-0 bg-fit-primary/5 opacity-0 group-hover:opacity-100 transition-all rounded-[2.5rem] pointer-events-none" />
+                            {/* User Role Tag */}
+                            {isMe && (
+                              <div className="absolute top-6 right-6 px-4 py-1.5 bg-fit-primary/10 border border-fit-primary/20 rounded-xl backdrop-blur-md">
+                                <span className="text-[9px] font-black text-fit-primary uppercase tracking-widest">Vous</span>
+                              </div>
+                            )}
+
+                            {/* Decorative Corner Elements */}
+                            <div className="absolute top-0 left-0 w-16 h-16 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                           </motion.div>
                         );
                       })}
                       {(!voiceStates[activeChannel] || voiceStates[activeChannel].length === 0) && (
-                        <div className="col-span-full flex flex-col items-center justify-center text-fit-muted opacity-20 py-20">
-                          <Volume2 size={80} className="mb-6" />
-                          <p className="font-black uppercase tracking-[0.4em] text-sm">Salon vocal vide</p>
-                        </div>
+                        <motion.div 
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="col-span-full flex flex-col items-center justify-center text-fit-muted/20 py-20"
+                        >
+                          <div className="w-40 h-40 rounded-full border-2 border-dashed border-white/5 flex items-center justify-center mb-10 relative">
+                            <Volume2 size={64} className="animate-pulse" />
+                            <div className="absolute inset-0 rounded-full border-2 border-fit-primary/20 animate-ping" />
+                          </div>
+                          <p className="font-black uppercase tracking-[0.6em] text-sm text-center max-w-xs leading-relaxed">
+                            Le salon est calme...<br/>Invitez des amis à rejoindre !
+                          </p>
+                        </motion.div>
                       )}
                     </div>
                   </div>
 
-                  {/* Voice Controls Overlay */}
-                  <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-4 px-8 py-4 bg-fit-surface/80 backdrop-blur-xl border border-fit-border rounded-[2.5rem] shadow-2xl z-50">
-                    <button 
-                      onClick={toggleMute}
-                      className={cn(
-                        "w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-lg",
-                        isMuted ? "bg-fit-accent text-white" : "bg-fit-bg text-fit-text hover:bg-fit-primary hover:text-white"
-                      )}
-                    >
-                      {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
-                    </button>
-                    <button 
-                      className="w-14 h-14 rounded-2xl bg-fit-bg text-fit-text flex items-center justify-center hover:bg-fit-primary hover:text-white transition-all shadow-lg"
-                    >
-                      <Settings size={24} />
-                    </button>
-                    <div className="w-[1px] h-8 bg-fit-border mx-2" />
+                  {/* Voice Controls Overlay - Premium Hardware Style */}
+                  <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-8 px-12 py-6 bg-black/60 backdrop-blur-3xl border border-white/10 rounded-[3.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.8)] z-50 group/controls">
+                    <div className="flex items-center gap-5">
+                      <button 
+                        onClick={toggleMute}
+                        className={cn(
+                          "w-16 h-16 rounded-[1.8rem] flex items-center justify-center transition-all duration-500 shadow-2xl relative group/btn",
+                          isMuted 
+                            ? "bg-fit-accent text-white hover:bg-red-600 hover:rotate-6" 
+                            : "bg-white/5 text-white hover:bg-fit-primary hover:scale-110 hover:-rotate-3"
+                        )}
+                      >
+                        {isMuted ? <MicOff size={28} /> : <Mic size={28} />}
+                        <div className="absolute -top-14 left-1/2 -translate-x-1/2 px-4 py-2 bg-fit-surface text-[10px] font-black uppercase tracking-widest rounded-xl opacity-0 group-hover/btn:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap border border-fit-border shadow-2xl translate-y-2 group-hover/btn:translate-y-0">
+                          {isMuted ? "Micro coupé" : "Micro actif"}
+                        </div>
+                      </button>
+
+                      <button 
+                        className="w-16 h-16 rounded-[1.8rem] bg-white/5 text-white flex items-center justify-center hover:bg-white/10 hover:scale-110 transition-all duration-500 shadow-2xl group/btn"
+                      >
+                        <Video size={28} />
+                        <div className="absolute -top-14 left-1/2 -translate-x-1/2 px-4 py-2 bg-fit-surface text-[10px] font-black uppercase tracking-widest rounded-xl opacity-0 group-hover/btn:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap border border-fit-border shadow-2xl translate-y-2 group-hover/btn:translate-y-0">
+                          Caméra
+                        </div>
+                      </button>
+
+                      <button 
+                        className="w-16 h-16 rounded-[1.8rem] bg-white/5 text-white flex items-center justify-center hover:bg-white/10 hover:scale-110 transition-all duration-500 shadow-2xl group/btn"
+                      >
+                        <Monitor size={28} />
+                        <div className="absolute -top-14 left-1/2 -translate-x-1/2 px-4 py-2 bg-fit-surface text-[10px] font-black uppercase tracking-widest rounded-xl opacity-0 group-hover/btn:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap border border-fit-border shadow-2xl translate-y-2 group-hover/btn:translate-y-0">
+                          Partage d'écran
+                        </div>
+                      </button>
+
+                      <button 
+                        className="w-16 h-16 rounded-[1.8rem] bg-white/5 text-white flex items-center justify-center hover:bg-white/10 hover:scale-110 transition-all duration-500 shadow-2xl group/btn"
+                      >
+                        <Settings size={28} />
+                        <div className="absolute -top-14 left-1/2 -translate-x-1/2 px-4 py-2 bg-fit-surface text-[10px] font-black uppercase tracking-widest rounded-xl opacity-0 group-hover/btn:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap border border-fit-border shadow-2xl translate-y-2 group-hover/btn:translate-y-0">
+                          Paramètres
+                        </div>
+                      </button>
+                    </div>
+
+                    <div className="w-[1px] h-12 bg-white/10 mx-2" />
+
                     <button 
                       onClick={onLeaveVoice}
-                      className="px-8 h-14 bg-fit-accent text-white rounded-2xl font-black uppercase tracking-widest flex items-center gap-3 hover:bg-red-600 transition-all shadow-lg shadow-fit-accent/20"
+                      className="group/leave relative px-12 h-16 bg-fit-accent text-white rounded-[1.8rem] font-black uppercase tracking-[0.25em] text-[10px] flex items-center gap-4 hover:bg-red-600 hover:scale-105 active:scale-95 transition-all duration-500 shadow-2xl shadow-fit-accent/30"
                     >
-                      <PhoneOff size={20} />
+                      <PhoneOff size={22} className="group-hover/leave:animate-bounce" />
                       Déconnexion
                     </button>
                   </div>
@@ -1138,12 +1275,25 @@ export function ChatInterface({
                         className="flex items-center gap-2"
                       >
                         <label 
-                          className="w-12 h-12 flex items-center justify-center text-fit-muted hover:text-fit-primary hover:bg-fit-primary/5 rounded-full transition-all cursor-pointer relative group"
-                          title={`Limite d'envoi : ${me?.canSendLargeVideos || isOwner ? '500 Mo' : '50 Mo'}`}
+                          className={cn(
+                            "w-12 h-12 flex items-center justify-center text-fit-muted hover:text-fit-primary hover:bg-fit-primary/5 rounded-full transition-all cursor-pointer relative group",
+                            isUploading && "animate-pulse cursor-not-allowed"
+                          )}
+                          title={`Limite d'envoi : ${me?.canSendLargeVideos || isOwner ? '1 Go' : '50 Mo'}`}
                         >
-                          <Plus size={24} />
-                          <input type="file" className="hidden" onChange={handleFileUpload} />
-                          {(me?.canSendLargeVideos || isOwner) && (
+                          {isUploading ? (
+                            <div className="w-6 h-6 border-2 border-fit-primary border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Plus size={24} />
+                          )}
+                          <input 
+                            type="file" 
+                            className="hidden" 
+                            ref={fileInputRef}
+                            onChange={handleFileUpload} 
+                            disabled={isUploading}
+                          />
+                          {(me?.canSendLargeVideos || isOwner) && !isUploading && (
                             <div className="absolute -top-1 -right-1 bg-emerald-500 text-white p-0.5 rounded-full shadow-lg">
                               <Video size={8} />
                             </div>
