@@ -698,6 +698,11 @@ export function ChatInterface({
       
       if (me?.callSoundsEnabled !== false) {
         // La sonnerie YouTube est gérée par ReactPlayer via isPlayingRingtone
+        // On tente de forcer l'activation du contexte audio au cas où
+        const audio = new Audio();
+        audio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+        audio.play().catch(() => {});
+        
         setIsPlayingRingtone(true);
       }
     };
@@ -743,6 +748,27 @@ export function ChatInterface({
     const handleSignal = (e: any) => {
       // Handle signaling if needed for PeerJS (usually PeerJS handles it, but we have it for custom logic)
     };
+
+    // Global click listener to unlock audio context for ringtones
+    const unlockAudio = () => {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      // Play a tiny silent buffer
+      const buffer = audioCtx.createBuffer(1, 1, 22050);
+      const source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioCtx.destination);
+      source.start(0);
+      
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+      console.log("[Audio] Context unlocked");
+    };
+
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
 
     window.addEventListener('vox_private_call_incoming' as any, handleIncoming);
     window.addEventListener('vox_private_call_accepted' as any, handleAccepted);
@@ -806,6 +832,11 @@ export function ChatInterface({
           isMinimized: false
         });
         if (me?.callSoundsEnabled !== false) {
+          // Force audio context activation
+          const audio = new Audio();
+          audio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+          audio.play().catch(() => {});
+          
           setIsPlayingRingtone(true);
         }
         onInitPrivateCall(targetUsername, id);
@@ -3266,39 +3297,39 @@ export function ChatInterface({
                 <>
                   {/* Call Background with Fade */}
                   <div className="absolute inset-0 z-0 bg-[#1a1b1e] overflow-hidden">
-                    {/* Top Banner with Blur/Fade */}
-                    <div className="absolute top-0 left-0 w-full h-[65%] overflow-hidden">
+                    {/* Kaaris Image (Bottom) */}
+                    <div className="absolute bottom-0 left-0 w-full h-1/2 overflow-hidden">
+                      <img
+                        src={getDirectUrl(KAARIS_BANNER)}
+                        alt="Kaaris"
+                        className="w-full h-full object-cover opacity-40"
+                        referrerPolicy="no-referrer"
+                      />
+                      {/* Fade top of Kaaris */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#1a1b1e] via-transparent to-transparent" />
+                    </div>
+                    
+                    {/* Top Banner with Blur/Fade into Kaaris */}
+                    <div className="absolute top-0 left-0 w-full h-[60%] overflow-hidden">
                       <AnimatePresence mode="wait">
                         <motion.img
                           key={privateCall.banner || appConfig.default_call_banner}
                           initial={{ opacity: 0 }}
-                          animate={{ opacity: 0.6 }}
+                          animate={{ opacity: 0.8 }}
                           exit={{ opacity: 0 }}
                           transition={{ duration: 1.2 }}
                           src={getDirectUrl(privateCall.banner || appConfig.default_call_banner || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000")}
                           alt="Banner"
-                          className="w-full h-full object-cover scale-110 blur-[2px]"
+                          className="w-full h-full object-cover"
                           referrerPolicy="no-referrer"
                         />
                       </AnimatePresence>
-                      {/* Dark overlay to match the image's mood */}
-                      <div className="absolute inset-0 bg-black/40" />
-                      {/* Gradient to fade the banner into the dark background */}
-                      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#1a1b1e]/60 to-[#1a1b1e]" />
+                      {/* Gradient to blend banner into background */}
+                      <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-[#1a1b1e]" />
                     </div>
-
-                    {/* Bottom part: Kaaris Image as background replacement for gray */}
-                    <div className="absolute bottom-0 left-0 w-full h-[50%] overflow-hidden">
-                      <motion.img
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 0.15 }}
-                        src={getDirectUrl(KAARIS_BANNER)}
-                        alt="Kaaris"
-                        className="w-full h-full object-cover grayscale brightness-50"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#1a1b1e] via-[#1a1b1e]/40 to-transparent" />
-                    </div>
+                    
+                    {/* Overall dark overlay to match the image's mood */}
+                    <div className="absolute inset-0 bg-black/10" />
                   </div>
 
                   {/* Minimize Button */}
@@ -3351,21 +3382,6 @@ export function ChatInterface({
 
                     {/* Call Actions */}
                     <div className="flex flex-col items-center gap-6">
-                      {/* Sound Activation Button (if blocked by browser) */}
-                      {isPlayingRingtone && (
-                        <button 
-                          onClick={() => {
-                            // Interaction to unlock audio
-                            setIsPlayingRingtone(false);
-                            setTimeout(() => setIsPlayingRingtone(true), 100);
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white/70 rounded-full text-[10px] uppercase tracking-widest backdrop-blur-md border border-white/10 transition-all active:scale-95 mb-2"
-                        >
-                          <Volume2 size={12} />
-                          <span>Activer le son si muet</span>
-                        </button>
-                      )}
-
                       <div className="flex items-center gap-10">
                         {privateCall.status === 'incoming' ? (
                           <>
@@ -3402,40 +3418,43 @@ export function ChatInterface({
                   <RemoteVideo stream={privateRemoteStream} />
                 </div>
               )}
-
-              {/* Hidden YouTube Player for Ringtone */}
-              <div className="absolute top-0 left-0 w-1 h-1 pointer-events-none opacity-[0.01] overflow-hidden">
-                <ReactPlayer
-                  {...({
-                    url: KALASH_YOUTUBE,
-                    playing: isPlayingRingtone,
-                    loop: true,
-                    volume: 0.6,
-                    width: '100%',
-                    height: '100%',
-                    playsinline: true,
-                    onStart: () => console.log("YouTube Ringtone Started"),
-                    onPlay: () => console.log("YouTube Ringtone Playing"),
-                    onError: (e: any) => console.error("YouTube Ringtone Error:", e),
-                    config: {
-                      youtube: {
-                        playerVars: { 
-                          autoplay: 1,
-                          controls: 0, 
-                          disablekb: 1,
-                          modestbranding: 1,
-                          rel: 0,
-                          origin: window.location.origin
-                        }
-                      }
-                    }
-                  } as any)}
-                />
-              </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
+
+      {/* Hidden YouTube Player for Ringtone - Outside modal for better reliability */}
+      <div className="fixed top-0 left-0 w-10 h-10 pointer-events-none opacity-[0.01] overflow-hidden z-[999]">
+        <ReactPlayer
+          {...({
+            url: "https://www.youtube.com/watch?v=wlgyrEnNmMM",
+            playing: isPlayingRingtone,
+            loop: true,
+            volume: 0.9,
+            width: '100%',
+            height: '100%',
+            playsinline: true,
+            onReady: () => console.log("[Audio] YouTube Player Ready"),
+            onStart: () => console.log("[Audio] YouTube Ringtone Started"),
+            onPlay: () => console.log("[Audio] YouTube Ringtone Playing"),
+            onError: (e: any) => console.error("[Audio] YouTube Ringtone Error:", e),
+            config: {
+              youtube: {
+                playerVars: { 
+                  autoplay: 1,
+                  mute: 0,
+                  controls: 0, 
+                  disablekb: 1,
+                  modestbranding: 1,
+                  rel: 0,
+                  origin: window.location.origin,
+                  enablejsapi: 1
+                }
+              }
+            }
+          } as any)}
+        />
+      </div>
     </div>
   );
 }
