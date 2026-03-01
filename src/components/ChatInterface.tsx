@@ -696,12 +696,13 @@ export function ChatInterface({
         isMinimized: false 
       });
       
+      // Toujours tenter de jouer la sonnerie, sauf si explicitement désactivé
       if (me?.callSoundsEnabled !== false) {
-        // La sonnerie YouTube est gérée par ReactPlayer via isPlayingRingtone
-        // On tente de forcer l'activation du contexte audio au cas où
+        console.log("[Audio] Triggering incoming ringtone");
+        // Force audio context activation
         const audio = new Audio();
         audio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
-        audio.play().catch(() => {});
+        audio.play().catch((err) => console.warn("[Audio] Autoplay blocked:", err));
         
         setIsPlayingRingtone(true);
       }
@@ -831,11 +832,13 @@ export function ChatInterface({
           banner: targetUser?.banner,
           isMinimized: false
         });
+        // Toujours tenter de jouer la sonnerie, sauf si explicitement désactivé
         if (me?.callSoundsEnabled !== false) {
+          console.log("[Audio] Triggering outgoing ringtone");
           // Force audio context activation
           const audio = new Audio();
           audio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
-          audio.play().catch(() => {});
+          audio.play().catch((err) => console.warn("[Audio] Autoplay blocked:", err));
           
           setIsPlayingRingtone(true);
         }
@@ -3297,39 +3300,35 @@ export function ChatInterface({
                 <>
                   {/* Call Background with Fade */}
                   <div className="absolute inset-0 z-0 bg-[#1a1b1e] overflow-hidden">
-                    {/* Kaaris Image (Bottom) */}
-                    <div className="absolute bottom-0 left-0 w-full h-1/2 overflow-hidden">
-                      <img
-                        src={getDirectUrl(KAARIS_BANNER)}
-                        alt="Kaaris"
-                        className="w-full h-full object-cover opacity-40"
-                        referrerPolicy="no-referrer"
+                    {/* Bottom Image (Kaaris) - Base layer */}
+                    <img
+                      src={getDirectUrl(KAARIS_BANNER)}
+                      alt="Kaaris"
+                      className="absolute inset-0 w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                    
+                    {/* Top Image (Banner) - Masked layer using background-image for better blending */}
+                    <AnimatePresence mode="wait">
+                      <motion.div
+                        key={privateCall.banner || appConfig.default_call_banner}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 1.2 }}
+                        className="absolute inset-0 w-full h-full"
+                        style={{
+                          backgroundImage: `url(${getDirectUrl(privateCall.banner || appConfig.default_call_banner || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000")})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 85%)',
+                          WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 85%)'
+                        }}
                       />
-                      {/* Fade top of Kaaris */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#1a1b1e] via-transparent to-transparent" />
-                    </div>
+                    </AnimatePresence>
                     
-                    {/* Top Banner with Blur/Fade into Kaaris */}
-                    <div className="absolute top-0 left-0 w-full h-[60%] overflow-hidden">
-                      <AnimatePresence mode="wait">
-                        <motion.img
-                          key={privateCall.banner || appConfig.default_call_banner}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 0.8 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 1.2 }}
-                          src={getDirectUrl(privateCall.banner || appConfig.default_call_banner || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000")}
-                          alt="Banner"
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                      </AnimatePresence>
-                      {/* Gradient to blend banner into background */}
-                      <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-[#1a1b1e]" />
-                    </div>
-                    
-                    {/* Overall dark overlay to match the image's mood */}
-                    <div className="absolute inset-0 bg-black/10" />
+                    {/* Dark gradient overlays for text readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#1a1b1e] via-transparent to-black/40" />
                   </div>
 
                   {/* Minimize Button */}
@@ -3423,38 +3422,16 @@ export function ChatInterface({
         )}
       </AnimatePresence>
 
-      {/* Hidden YouTube Player for Ringtone - Outside modal for better reliability */}
-      <div className="fixed top-0 left-0 w-10 h-10 pointer-events-none opacity-[0.01] overflow-hidden z-[999]">
-        <ReactPlayer
-          {...({
-            url: "https://www.youtube.com/watch?v=wlgyrEnNmMM",
-            playing: isPlayingRingtone,
-            loop: true,
-            volume: 0.9,
-            width: '100%',
-            height: '100%',
-            playsinline: true,
-            onReady: () => console.log("[Audio] YouTube Player Ready"),
-            onStart: () => console.log("[Audio] YouTube Ringtone Started"),
-            onPlay: () => console.log("[Audio] YouTube Ringtone Playing"),
-            onError: (e: any) => console.error("[Audio] YouTube Ringtone Error:", e),
-            config: {
-              youtube: {
-                playerVars: { 
-                  autoplay: 1,
-                  mute: 0,
-                  controls: 0, 
-                  disablekb: 1,
-                  modestbranding: 1,
-                  rel: 0,
-                  origin: window.location.origin,
-                  enablejsapi: 1
-                }
-              }
-            }
-          } as any)}
-        />
-      </div>
+      {/* Hidden YouTube Player for Ringtone - Using direct iframe for better autoplay support */}
+      {isPlayingRingtone && (
+        <div className="fixed top-0 left-0 w-1 h-1 pointer-events-none opacity-[0.001] overflow-hidden z-[-1]">
+          <iframe
+            src={`https://www.youtube.com/embed/wlgyrEnNmMM?autoplay=1&mute=0&loop=1&playlist=wlgyrEnNmMM&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
+            allow="autoplay; encrypted-media"
+            className="w-full h-full border-0"
+          />
+        </div>
+      )}
     </div>
   );
 }
