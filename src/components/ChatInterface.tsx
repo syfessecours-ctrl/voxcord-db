@@ -131,7 +131,7 @@ const getDirectUrl = (url: string) => {
 };
 
 const KAARIS_BANNER = "https://www.dropbox.com/scl/fi/16fkgzy6fec6f96iubyxb/Kaaris-soutient-Aurier-dans-le-scandale-des-insultes.webp?rlkey=w7qb17whbbd12ttftfim5euwm&st=ju09pv3d&raw=1";
-const KALASH_YOUTUBE = "https://youtu.be/wlgyrEnNmMM";
+const KALASH_RINGTONE_URL = "https://www.dropbox.com/scl/fi/mbqd7wa8vwsbvt1uk96fm/Booba-feat-Kaaris-Kalash-Clip-Officiel-1.mp3?rlkey=skq5teslhj6cjhqmh8l22vnrr&st=rs4esv9n&raw=1";
 
 export function ChatInterface({
   username,
@@ -249,6 +249,37 @@ export function ChatInterface({
   const privateRemoteStreamRef = useRef<MediaStream | null>(null);
   const [privateRemoteStream, setPrivateRemoteStream] = useState<MediaStream | null>(null);
   const [isPlayingRingtone, setIsPlayingRingtone] = useState(false);
+  const ringtoneAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Initialize ringtone audio
+  useEffect(() => {
+    const audio = new Audio(KALASH_RINGTONE_URL);
+    audio.loop = true;
+    audio.volume = 0.6;
+    ringtoneAudioRef.current = audio;
+
+    return () => {
+      audio.pause();
+      audio.src = "";
+    };
+  }, []);
+
+  // Handle ringtone playback
+  useEffect(() => {
+    if (!ringtoneAudioRef.current) return;
+
+    if (isPlayingRingtone) {
+      const playPromise = ringtoneAudioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.warn("[Audio] Autoplay prevented, waiting for interaction:", error);
+        });
+      }
+    } else {
+      ringtoneAudioRef.current.pause();
+      ringtoneAudioRef.current.currentTime = 0;
+    }
+  }, [isPlayingRingtone]);
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
   const [showCreateServerModal, setShowCreateServerModal] = useState(false);
   const [newServerName, setNewServerName] = useState('');
@@ -3300,15 +3331,15 @@ export function ChatInterface({
                 <>
                   {/* Call Background with Fade */}
                   <div className="absolute inset-0 z-0 bg-[#1a1b1e] overflow-hidden">
-                    {/* Bottom Image (Kaaris) - Base layer */}
+                    {/* Bottom Image (Kaaris) - Base layer, more visible */}
                     <img
                       src={getDirectUrl(KAARIS_BANNER)}
                       alt="Kaaris"
-                      className="absolute inset-0 w-full h-full object-cover"
+                      className="absolute inset-0 w-full h-full object-cover opacity-70"
                       referrerPolicy="no-referrer"
                     />
                     
-                    {/* Top Image (Banner) - Masked layer using background-image for better blending */}
+                    {/* Top Image (Banner) - Smoother Masked layer */}
                     <AnimatePresence mode="wait">
                       <motion.div
                         key={privateCall.banner || appConfig.default_call_banner}
@@ -3321,14 +3352,14 @@ export function ChatInterface({
                           backgroundImage: `url(${getDirectUrl(privateCall.banner || appConfig.default_call_banner || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000")})`,
                           backgroundSize: 'cover',
                           backgroundPosition: 'center',
-                          maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 85%)',
-                          WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 85%)'
+                          maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 70%)',
+                          WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 70%)'
                         }}
                       />
                     </AnimatePresence>
                     
-                    {/* Dark gradient overlays for text readability */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#1a1b1e] via-transparent to-black/40" />
+                    {/* Dark gradient overlays for text readability and depth */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#1a1b1e] via-transparent to-black/30" />
                   </div>
 
                   {/* Minimize Button */}
@@ -3422,16 +3453,8 @@ export function ChatInterface({
         )}
       </AnimatePresence>
 
-      {/* Hidden YouTube Player for Ringtone - Using direct iframe for better autoplay support */}
-      {isPlayingRingtone && (
-        <div className="fixed top-0 left-0 w-1 h-1 pointer-events-none opacity-[0.001] overflow-hidden z-[-1]">
-          <iframe
-            src={`https://www.youtube.com/embed/wlgyrEnNmMM?autoplay=1&mute=0&loop=1&playlist=wlgyrEnNmMM&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
-            allow="autoplay; encrypted-media"
-            className="w-full h-full border-0"
-          />
-        </div>
-      )}
+      {/* Hidden Audio Player for Ringtone - Using native HTML5 Audio for better reliability */}
+      {/* The audio is managed via ringtoneAudioRef in the useEffect */}
     </div>
   );
 }
