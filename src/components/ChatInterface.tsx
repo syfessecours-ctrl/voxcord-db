@@ -119,10 +119,18 @@ function RemoteVideo({ stream, className }: { stream: MediaStream, className?: s
 const getDirectUrl = (url: string) => {
   if (!url) return url;
   if (url.includes('dropbox.com')) {
-    return url.replace(/\?dl=[01]/, '?raw=1').replace(/&dl=[01]/, '&raw=1');
+    // Force raw=1 for Dropbox links to ensure direct content delivery
+    const cleanUrl = url.split('?')[0];
+    const params = new URLSearchParams(url.split('?')[1] || '');
+    params.set('raw', '1');
+    params.delete('dl');
+    return `${cleanUrl}?${params.toString()}`;
   }
   return url;
 };
+
+const KAARIS_BANNER = "https://www.dropbox.com/scl/fi/16fkgzy6fec6f96iubyxb/Kaaris-soutient-Aurier-dans-le-scandale-des-insultes.webp?rlkey=w7qb17whbbd12ttftfim5euwm&st=ju09pv3d&raw=1";
+const KALASH_RINGTONE = "https://www.dropbox.com/scl/fi/mbqd7wa8vwsbvt1uk96fm/Booba-feat-Kaaris-Kalash-Clip-Officiel-1.mp3?rlkey=skq5teslhj6cjhqmh8l22vnrr&st=z1awuhbq&raw=1";
 
 export function ChatInterface({
   username,
@@ -687,8 +695,8 @@ export function ChatInterface({
       });
       
       if (me?.callSoundsEnabled !== false) {
-        // Prioritize official ringtone if set in appConfig
-        const ringtone = getDirectUrl(appConfig.default_ringtone || me?.ringtoneUrl || 'https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3');
+        // Priorité absolue à la sonnerie demandée
+        const ringtone = getDirectUrl(KALASH_RINGTONE || appConfig.default_ringtone || me?.ringtoneUrl || 'https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3');
         ringtoneRef.current = new Audio(ringtone);
         ringtoneRef.current.loop = true;
         ringtoneRef.current.play().catch(err => console.error("Error playing ringtone:", err));
@@ -3252,23 +3260,25 @@ export function ChatInterface({
               ) : (
                 <>
                   {/* Call Background with Fade */}
-                  <div className="absolute inset-0 z-0">
+                  <div className="absolute inset-0 z-0 bg-fit-bg">
                     <AnimatePresence mode="wait">
-                      {(appConfig.default_call_banner || privateCall.banner) && (
-                        <motion.img
-                          key="banner"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 0.6 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 1 }}
-                          src={getDirectUrl(appConfig.default_call_banner || privateCall.banner)}
-                          alt="Background"
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                      )}
+                      <motion.img
+                        key="banner"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 0.7 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 1 }}
+                        src={getDirectUrl(KAARIS_BANNER || appConfig.default_call_banner || privateCall.banner)}
+                        alt="Background"
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          // Fallback ultime si Dropbox échoue
+                          (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000";
+                        }}
+                      />
                     </AnimatePresence>
-                    <div className="absolute inset-0 bg-gradient-to-b from-fit-surface/60 via-fit-surface/80 to-fit-surface" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-fit-surface/40 via-fit-surface/60 to-fit-surface" />
                   </div>
 
                   {/* Minimize Button */}
