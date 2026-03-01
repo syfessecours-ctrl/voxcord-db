@@ -667,7 +667,7 @@ export function ChatInterface({
       setPrivateCall({ status: 'incoming', otherUser: from, peerId, displayName, avatar, banner });
       
       if (me?.callSoundsEnabled !== false) {
-        const ringtone = me?.ringtoneUrl || 'https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3';
+        const ringtone = me?.ringtoneUrl || appConfig.default_ringtone || 'https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3';
         ringtoneRef.current = new Audio(ringtone);
         ringtoneRef.current.loop = true;
         ringtoneRef.current.play().catch(err => console.error("Error playing ringtone:", err));
@@ -765,7 +765,14 @@ export function ChatInterface({
       privatePeerRef.current = peer;
 
       peer.on('open', (id) => {
-        setPrivateCall({ status: 'calling', otherUser: targetUsername });
+        const targetUser = users.find(u => u.username === targetUsername);
+        setPrivateCall({ 
+          status: 'calling', 
+          otherUser: targetUsername,
+          displayName: targetUser?.displayName,
+          avatar: targetUser?.avatar,
+          banner: targetUser?.banner
+        });
         onInitPrivateCall(targetUsername, id);
       });
 
@@ -3183,27 +3190,27 @@ export function ChatInterface({
       {/* Private Call Screens */}
       <AnimatePresence>
         {privateCall.status !== 'idle' && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-fit-bg/95 backdrop-blur-xl">
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="w-full max-w-lg bg-fit-surface border border-fit-border rounded-[4rem] shadow-2xl overflow-hidden relative"
+              initial={{ opacity: 0, scale: 0.8, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 20 }}
+              className="w-full max-w-md bg-fit-surface border border-fit-border rounded-[2.5rem] shadow-2xl overflow-hidden relative"
             >
               {/* Call Banner */}
-              <div className="h-48 w-full relative overflow-hidden">
-                {privateCall.banner ? (
-                  <img src={privateCall.banner} alt="Banner" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <div className="h-40 w-full relative overflow-hidden">
+                {privateCall.banner || appConfig.default_call_banner ? (
+                  <img src={privateCall.banner || appConfig.default_call_banner} alt="Banner" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-fit-primary to-fit-accent opacity-20" />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-fit-surface to-transparent" />
               </div>
 
-              <div className="px-12 pb-12 -mt-16 relative flex flex-col items-center text-center">
+              <div className="px-8 pb-10 -mt-12 relative flex flex-col items-center text-center">
                 {/* Avatar */}
-                <div className="relative mb-6">
-                  <div className="w-32 h-32 rounded-[3rem] bg-fit-bg border-8 border-fit-surface shadow-2xl overflow-hidden flex items-center justify-center text-fit-muted font-black text-4xl">
+                <div className="relative mb-4">
+                  <div className="w-24 h-24 rounded-[2rem] bg-fit-bg border-4 border-fit-surface shadow-2xl overflow-hidden flex items-center justify-center text-fit-muted font-black text-3xl">
                     {privateCall.avatar ? (
                       <img src={privateCall.avatar} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
@@ -3211,60 +3218,57 @@ export function ChatInterface({
                     )}
                   </div>
                   {privateCall.status === 'active' && (
-                    <div className="absolute -bottom-2 -right-2 bg-emerald-500 w-8 h-8 rounded-full border-4 border-fit-surface flex items-center justify-center">
-                      <div className="w-2 h-2 bg-white rounded-full animate-ping" />
+                    <div className="absolute -bottom-1 -right-1 bg-emerald-500 w-6 h-6 rounded-full border-2 border-fit-surface flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
                     </div>
                   )}
                 </div>
 
-                <h2 className="text-4xl font-black text-fit-text tracking-tighter mb-2">
+                <h2 className="text-2xl font-black text-fit-text tracking-tighter mb-1">
                   {privateCall.displayName || privateCall.otherUser}
                 </h2>
                 
-                <div className="mb-12">
+                <div className="mb-8">
                   {privateCall.status === 'calling' && (
-                    <div className="flex flex-col items-center gap-2">
-                      <span className="text-fit-primary font-black text-xs uppercase tracking-[0.3em] animate-pulse">Appel en cours...</span>
-                      <p className="text-fit-muted text-xs font-bold opacity-60">En attente de réponse</p>
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-fit-primary font-black text-[10px] uppercase tracking-[0.3em] animate-pulse">Appel en cours...</span>
                     </div>
                   )}
                   {privateCall.status === 'incoming' && (
-                    <div className="flex flex-col items-center gap-2">
-                      <span className="text-fit-accent font-black text-xs uppercase tracking-[0.3em] animate-bounce">Appel entrant</span>
-                      <p className="text-fit-muted text-xs font-bold opacity-60">Souhaitez-vous répondre ?</p>
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-fit-accent font-black text-[10px] uppercase tracking-[0.3em] animate-bounce">Appel entrant</span>
                     </div>
                   )}
                   {privateCall.status === 'active' && (
-                    <div className="flex flex-col items-center gap-2">
-                      <span className="text-emerald-500 font-black text-xs uppercase tracking-[0.3em]">En communication</span>
-                      <p className="text-fit-muted text-xs font-bold opacity-60">Appel sécurisé</p>
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-emerald-500 font-black text-[10px] uppercase tracking-[0.3em]">En communication</span>
                     </div>
                   )}
                 </div>
 
                 {/* Call Actions */}
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-4">
                   {privateCall.status === 'incoming' ? (
                     <>
                       <button 
                         onClick={rejectCall}
-                        className="w-20 h-20 bg-fit-accent text-white rounded-full flex items-center justify-center shadow-2xl shadow-fit-accent/40 hover:scale-110 active:scale-95 transition-all"
+                        className="w-14 h-14 bg-fit-accent text-white rounded-full flex items-center justify-center shadow-xl shadow-fit-accent/40 hover:scale-110 active:scale-95 transition-all"
                       >
-                        <PhoneOff size={32} />
+                        <PhoneOff size={24} />
                       </button>
                       <button 
                         onClick={acceptCall}
-                        className="w-24 h-24 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-2xl shadow-emerald-500/40 hover:scale-110 active:scale-95 transition-all"
+                        className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-xl shadow-emerald-500/40 hover:scale-110 active:scale-95 transition-all"
                       >
-                        <Video size={40} />
+                        <Video size={28} />
                       </button>
                     </>
                   ) : (
                     <button 
                       onClick={endCall}
-                      className="w-24 h-24 bg-fit-accent text-white rounded-full flex items-center justify-center shadow-2xl shadow-fit-accent/40 hover:scale-110 active:scale-95 transition-all"
+                      className="w-16 h-16 bg-fit-accent text-white rounded-full flex items-center justify-center shadow-xl shadow-fit-accent/40 hover:scale-110 active:scale-95 transition-all"
                     >
-                      <PhoneOff size={40} />
+                      <PhoneOff size={28} />
                     </button>
                   )}
                 </div>
