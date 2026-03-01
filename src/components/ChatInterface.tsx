@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import ReactPlayer from 'react-player';
 import { Peer } from 'peerjs';
 import { AnimeEntryAnimation } from './AnimeEntryAnimation';
 import { 
@@ -130,7 +131,7 @@ const getDirectUrl = (url: string) => {
 };
 
 const KAARIS_BANNER = "https://www.dropbox.com/scl/fi/16fkgzy6fec6f96iubyxb/Kaaris-soutient-Aurier-dans-le-scandale-des-insultes.webp?rlkey=w7qb17whbbd12ttftfim5euwm&st=ju09pv3d&raw=1";
-const KALASH_RINGTONE = "https://www.dropbox.com/scl/fi/mbqd7wa8vwsbvt1uk96fm/Booba-feat-Kaaris-Kalash-Clip-Officiel-1.mp3?rlkey=skq5teslhj6cjhqmh8l22vnrr&st=z1awuhbq&raw=1";
+const KALASH_YOUTUBE = "https://youtu.be/wlgyrEnNmMM";
 
 export function ChatInterface({
   username,
@@ -247,6 +248,7 @@ export function ChatInterface({
   const privateMyStreamRef = useRef<MediaStream | null>(null);
   const privateRemoteStreamRef = useRef<MediaStream | null>(null);
   const [privateRemoteStream, setPrivateRemoteStream] = useState<MediaStream | null>(null);
+  const [isPlayingRingtone, setIsPlayingRingtone] = useState(false);
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
   const [showCreateServerModal, setShowCreateServerModal] = useState(false);
   const [newServerName, setNewServerName] = useState('');
@@ -695,11 +697,8 @@ export function ChatInterface({
       });
       
       if (me?.callSoundsEnabled !== false) {
-        // Priorité absolue à la sonnerie demandée
-        const ringtone = getDirectUrl(KALASH_RINGTONE || appConfig.default_ringtone || me?.ringtoneUrl || 'https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3');
-        ringtoneRef.current = new Audio(ringtone);
-        ringtoneRef.current.loop = true;
-        ringtoneRef.current.play().catch(err => console.error("Error playing ringtone:", err));
+        // La sonnerie YouTube est gérée par ReactPlayer via isPlayingRingtone
+        setIsPlayingRingtone(true);
       }
     };
 
@@ -707,6 +706,7 @@ export function ChatInterface({
       const { from, peerId } = e.detail;
       if (privateCall.status === 'calling' && privateCall.otherUser === from) {
         setPrivateCall(prev => ({ ...prev, status: 'active', peerId, isMinimized: true }));
+        setIsPlayingRingtone(false);
         
         // Stop calling sound if we had one (optional)
         if (ringtoneRef.current) {
@@ -756,10 +756,12 @@ export function ChatInterface({
       window.removeEventListener('vox_private_call_rejected' as any, handleRejected);
       window.removeEventListener('vox_private_call_ended' as any, handleEnded);
       window.removeEventListener('vox_private_call_signal' as any, handleSignal);
+      setIsPlayingRingtone(false);
     };
   }, [privateCall, me]);
 
   const cleanupPrivateCall = () => {
+    setIsPlayingRingtone(false);
     if (ringtoneRef.current) {
       ringtoneRef.current.pause();
       ringtoneRef.current = null;
@@ -803,6 +805,9 @@ export function ChatInterface({
           banner: targetUser?.banner,
           isMinimized: false
         });
+        if (me?.callSoundsEnabled !== false) {
+          setIsPlayingRingtone(true);
+        }
         onInitPrivateCall(targetUsername, id);
       });
 
@@ -3260,25 +3265,35 @@ export function ChatInterface({
               ) : (
                 <>
                   {/* Call Background with Fade */}
-                  <div className="absolute inset-0 z-0 bg-fit-bg">
+                  <div className="absolute inset-0 z-0 bg-fit-bg overflow-hidden">
+                    {/* Image Kaaris en fond permanent (légèrement assombrie) */}
+                    <img
+                      src={getDirectUrl(KAARIS_BANNER)}
+                      alt="Kaaris Background"
+                      className="absolute inset-0 w-full h-full object-cover opacity-40"
+                      referrerPolicy="no-referrer"
+                    />
+                    
                     <AnimatePresence mode="wait">
-                      <motion.img
-                        key="banner"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 0.7 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 1 }}
-                        src={getDirectUrl(KAARIS_BANNER || appConfig.default_call_banner || privateCall.banner)}
-                        alt="Background"
-                        className="w-full h-full object-cover"
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          // Fallback ultime si Dropbox échoue
-                          (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000";
-                        }}
-                      />
+                      {/* Bannière de l'appelant en fondu par-dessus */}
+                      {(privateCall.banner || appConfig.default_call_banner) && (
+                        <motion.img
+                          key={privateCall.banner || appConfig.default_call_banner}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 0.6 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 1.5 }}
+                          src={getDirectUrl(privateCall.banner || appConfig.default_call_banner)}
+                          alt="Caller Banner"
+                          className="absolute inset-0 w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      )}
                     </AnimatePresence>
-                    <div className="absolute inset-0 bg-gradient-to-b from-fit-surface/40 via-fit-surface/60 to-fit-surface" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-fit-surface/20 via-fit-surface/40 to-fit-surface" />
                   </div>
 
                   {/* Minimize Button */}
@@ -3367,6 +3382,25 @@ export function ChatInterface({
                   <RemoteVideo stream={privateRemoteStream} />
                 </div>
               )}
+
+              {/* Hidden YouTube Player for Ringtone */}
+              <div className="hidden pointer-events-none opacity-0">
+                <ReactPlayer
+                  {...({
+                    url: KALASH_YOUTUBE,
+                    playing: isPlayingRingtone,
+                    loop: true,
+                    volume: 0.4,
+                    width: 0,
+                    height: 0,
+                    config: {
+                      youtube: {
+                        playerVars: { controls: 0, disablekb: 1 }
+                      }
+                    }
+                  } as any)}
+                />
+              </div>
             </motion.div>
           </div>
         )}
