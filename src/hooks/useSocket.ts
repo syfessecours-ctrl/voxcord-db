@@ -77,7 +77,7 @@ export function useSocket(username: string) {
     });
 
     newSocket.on('error', (msg) => {
-      alert(msg);
+      window.dispatchEvent(new CustomEvent('vox_alert', { detail: msg }));
     });
 
     newSocket.on('user_list', (list) => setUsers(list));
@@ -168,6 +168,26 @@ export function useSocket(username: string) {
     newSocket.on('voice_signal', (data) => {
       // This will be handled by ChatInterface via an event listener or a ref
       window.dispatchEvent(new CustomEvent('vox_voice_signal', { detail: data }));
+    });
+
+    newSocket.on('private_call_incoming', (data) => {
+      window.dispatchEvent(new CustomEvent('vox_private_call_incoming', { detail: data }));
+    });
+
+    newSocket.on('private_call_accepted', (data) => {
+      window.dispatchEvent(new CustomEvent('vox_private_call_accepted', { detail: data }));
+    });
+
+    newSocket.on('private_call_rejected', (data) => {
+      window.dispatchEvent(new CustomEvent('vox_private_call_rejected', { detail: data }));
+    });
+
+    newSocket.on('private_call_ended', (data) => {
+      window.dispatchEvent(new CustomEvent('vox_private_call_ended', { detail: data }));
+    });
+
+    newSocket.on('private_call_signal', (data) => {
+      window.dispatchEvent(new CustomEvent('vox_private_call_signal', { detail: data }));
     });
 
     newSocket.on('channel_updated', (updatedChannel) => {
@@ -367,6 +387,30 @@ export function useSocket(username: string) {
     window.location.reload();
   };
 
+  const updateCallSettings = (soundsEnabled: boolean, ringtoneUrl?: string) => {
+    socketRef.current?.emit('update_call_settings', { soundsEnabled, ringtoneUrl });
+  };
+
+  const initPrivateCall = (to: string, peerId: string) => {
+    socketRef.current?.emit('private_call_init', { to, peerId });
+  };
+
+  const acceptPrivateCall = (to: string, peerId: string) => {
+    socketRef.current?.emit('private_call_accept', { to, peerId });
+  };
+
+  const rejectPrivateCall = (to: string) => {
+    socketRef.current?.emit('private_call_reject', { to });
+  };
+
+  const endPrivateCall = (to: string) => {
+    socketRef.current?.emit('private_call_end', { to });
+  };
+
+  const sendPrivateCallSignal = (to: string, signal: any) => {
+    socketRef.current?.emit('private_call_signal', { to, signal });
+  };
+
   return {
     isLoggedIn,
     users,
@@ -418,6 +462,15 @@ export function useSocket(username: string) {
     joinVoice,
     leaveVoice,
     sendVoiceSignal,
+    onMuteToggle: (channelId: string, isMuted: boolean) => {
+      socketRef.current?.emit('voice_mute_toggle', { channelId, isMuted });
+    },
+    updateCallSettings,
+    initPrivateCall,
+    acceptPrivateCall,
+    rejectPrivateCall,
+    endPrivateCall,
+    sendPrivateCallSignal,
     logout,
     socket: socketRef.current
   };

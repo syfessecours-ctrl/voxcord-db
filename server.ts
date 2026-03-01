@@ -91,7 +91,9 @@ async function initDb() {
       banner TEXT,
       bio TEXT,
       can_send_large_videos BOOLEAN DEFAULT false,
-      can_use_gifs BOOLEAN DEFAULT false
+      can_use_gifs BOOLEAN DEFAULT false,
+      call_sounds_enabled BOOLEAN DEFAULT true,
+      ringtone_url TEXT
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -206,7 +208,9 @@ async function initDb() {
       "ALTER TABLE users ADD COLUMN bio TEXT;",
       "ALTER TABLE users ADD COLUMN banner TEXT;",
       "ALTER TABLE users ADD COLUMN can_send_large_videos BOOLEAN DEFAULT false;",
-      "ALTER TABLE users ADD COLUMN can_use_gifs BOOLEAN DEFAULT false;"
+      "ALTER TABLE users ADD COLUMN can_use_gifs BOOLEAN DEFAULT false;",
+      "ALTER TABLE users ADD COLUMN call_sounds_enabled BOOLEAN DEFAULT true;",
+      "ALTER TABLE users ADD COLUMN ringtone_url TEXT;"
     ];
 
     for (const sql of sqliteMigrations) {
@@ -288,7 +292,7 @@ async function startServer() {
     });
 
   const users = new Map(); // socket.id -> user info
-  const voiceStates = new Map(); // channelId -> Set of { sid, username }
+  const voiceStates = new Map(); // channelId -> Set of { sid, username, isMuted }
 
   const getAppConfig = async () => {
     const rows = await query("SELECT * FROM app_config");
@@ -349,20 +353,22 @@ async function startServer() {
         if (!isValid) return socket.emit("login_error", "Mot de passe incorrect.");
         
         // Ensure owner role is updated if username matches OWNER_USERNAME exactly
-        if (username === OWNER_USERNAME && userRecord.role !== 'owner') {
-          await execute("UPDATE users SET role = 'owner', can_send_large_videos = true WHERE username = ?", [username]);
+        if (username === OWNER_USERNAME && (userRecord.role !== 'owner' || !userRecord.can_use_gifs)) {
+          await execute("UPDATE users SET role = 'owner', can_send_large_videos = true, can_use_gifs = true WHERE username = ?", [username]);
           userRecord.role = 'owner';
           userRecord.can_send_large_videos = true;
+          userRecord.can_use_gifs = true;
         }
       } else {
         const salt = await bcrypt.genSalt(10);
         const hash = await bcrypt.hash(password, salt);
         const role = username === OWNER_USERNAME ? 'owner' : 'user';
         const canSendLarge = role === 'owner';
+        const canUseGifs = role === 'owner';
         
-        await execute("INSERT INTO users (username, password_hash, role, last_ip, can_send_large_videos) VALUES (?, ?, ?, ?, ?)", 
-          [username, hash, role, clientIp, canSendLarge]);
-        userRecord = { username, role, can_send_large_videos: canSendLarge };
+        await execute("INSERT INTO users (username, password_hash, role, last_ip, can_send_large_videos, can_use_gifs) VALUES (?, ?, ?, ?, ?, ?)", 
+          [username, hash, role, clientIp, canSendLarge, canUseGifs]);
+        userRecord = { username, role, can_send_large_videos: canSendLarge, can_use_gifs: canUseGifs };
       }
 
       users.set(socket.id, { 
@@ -376,7 +382,9 @@ async function startServer() {
         banner: userRecord.banner,
         bio: userRecord.bio,
         canSendLargeVideos: !!userRecord.can_send_large_videos,
-        canUseGifs: !!userRecord.can_use_gifs
+        canUseGifs: !!userRecord.can_use_gifs,
+        callSoundsEnabled: !!userRecord.call_sounds_enabled,
+        ringtoneUrl: userRecord.ringtone_url
       });
       socket.join('general');
       
@@ -388,7 +396,9 @@ async function startServer() {
         banner: userRecord.banner,
         bio: userRecord.bio,
         canSendLargeVideos: !!userRecord.can_send_large_videos,
-        canUseGifs: !!userRecord.can_use_gifs
+        canUseGifs: !!userRecord.can_use_gifs,
+        callSoundsEnabled: !!userRecord.call_sounds_enabled,
+        ringtoneUrl: userRecord.ringtone_url
       });
       
       // Auto-join global server members if not already
@@ -615,7 +625,7 @@ async function startServer() {
       Array.from(channelSet).forEach((u: any) => {
         if (u.sid === socket.id) channelSet.delete(u);
       });
-      channelSet.add({ sid: socket.id, username: user.username });
+      channelSet.add({ sid: socket.id, username: user.username, isMuted: false });
       
       const currentUsers = Array.from(channelSet);
       io.emit("voice_state_update", { channelId, users: currentUsers });
@@ -646,6 +656,21 @@ async function startServer() {
       const user = users.get(socket.id);
       if (!user) return;
       io.to(to).emit("voice_signal", { from: socket.id, signal, username: user.username });
+    });
+
+    socket.on("voice_mute_toggle", ({ channelId, isMuted }) => {
+      const user = users.get(socket.id);
+      if (!user || !channelId) return;
+
+      const channelSet = voiceStates.get(channelId);
+      if (channelSet) {
+        // Update the user's mute status in the set
+        const userInChannel = Array.from(channelSet).find((u: any) => u.sid === socket.id);
+        if (userInChannel) {
+          (userInChannel as any).isMuted = isMuted;
+          io.emit("voice_state_update", { channelId, users: Array.from(channelSet) });
+        }
+      }
     });
 
     socket.on("invite_to_server", async ({ serverId, targetUsername }) => {
@@ -711,7 +736,9 @@ async function startServer() {
             banner,
             bio,
             canSendLargeVideos: u.canSendLargeVideos,
-            canUseGifs: u.canUseGifs
+            canUseGifs: u.canUseGifs,
+            callSoundsEnabled: u.callSoundsEnabled,
+            ringtoneUrl: u.ringtoneUrl
           });
         }
       }
@@ -726,6 +753,81 @@ async function startServer() {
         banner,
         bio
       });
+    });
+
+    socket.on("update_call_settings", async ({ soundsEnabled, ringtoneUrl }) => {
+      const user = users.get(socket.id);
+      if (!user) return;
+      
+      await execute("UPDATE users SET call_sounds_enabled = ?, ringtone_url = ? WHERE username = ?", [soundsEnabled, ringtoneUrl, user.username]);
+      
+      for (const [sid, u] of users.entries()) {
+        if (u.username === user.username) {
+          u.callSoundsEnabled = soundsEnabled;
+          u.ringtoneUrl = ringtoneUrl;
+          
+          io.to(sid).emit("me", { 
+            username: u.username, 
+            role: u.role, 
+            displayName: u.displayName, 
+            avatar: u.avatar, 
+            bio: u.bio, 
+            banner: u.banner,
+            canSendLargeVideos: u.canSendLargeVideos,
+            canUseGifs: u.canUseGifs,
+            callSoundsEnabled: soundsEnabled, 
+            ringtoneUrl 
+          });
+        }
+      }
+    });
+
+    // Private Calls
+    socket.on("private_call_init", ({ to, peerId }) => {
+      const fromUser = users.get(socket.id);
+      if (!fromUser) return;
+      
+      const targetSocketId = Array.from(users.entries()).find(([id, u]) => u.username === to)?.[0];
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("private_call_incoming", { 
+          from: fromUser.username, 
+          peerId,
+          displayName: fromUser.displayName,
+          avatar: fromUser.avatar,
+          banner: fromUser.banner
+        });
+      }
+    });
+
+    socket.on("private_call_accept", ({ to, peerId }) => {
+      const fromUser = users.get(socket.id);
+      if (!fromUser) return;
+      
+      const targetSocketId = Array.from(users.entries()).find(([id, u]) => u.username === to)?.[0];
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("private_call_accepted", { from: fromUser.username, peerId });
+      }
+    });
+
+    socket.on("private_call_reject", ({ to }) => {
+      const targetSocketId = Array.from(users.entries()).find(([id, u]) => u.username === to)?.[0];
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("private_call_rejected", { from: users.get(socket.id)?.username });
+      }
+    });
+
+    socket.on("private_call_end", ({ to }) => {
+      const targetSocketId = Array.from(users.entries()).find(([id, u]) => u.username === to)?.[0];
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("private_call_ended", { from: users.get(socket.id)?.username });
+      }
+    });
+
+    socket.on("private_call_signal", ({ to, signal }) => {
+      const targetSocketId = Array.from(users.entries()).find(([id, u]) => u.username === to)?.[0];
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("private_call_signal", { from: users.get(socket.id)?.username, signal });
+      }
     });
 
     socket.on("send_friend_request", async (targetUsername) => {

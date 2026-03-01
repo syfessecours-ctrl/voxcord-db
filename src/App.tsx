@@ -56,6 +56,13 @@ export default function App() {
     joinVoice,
     leaveVoice,
     sendVoiceSignal,
+    onMuteToggle,
+    initPrivateCall,
+    acceptPrivateCall,
+    rejectPrivateCall,
+    endPrivateCall,
+    sendPrivateCallSignal,
+    updateCallSettings,
     logout
   } = useSocket(username);
 
@@ -126,6 +133,13 @@ export default function App() {
       onCreateServer={createServer}
       onInviteToServer={inviteToServer}
       onSwitchServer={switchServer}
+      onMuteToggle={onMuteToggle}
+      onInitPrivateCall={initPrivateCall}
+      onAcceptPrivateCall={acceptPrivateCall}
+      onRejectPrivateCall={rejectPrivateCall}
+      onEndPrivateCall={endPrivateCall}
+      onSendPrivateCallSignal={sendPrivateCallSignal}
+      onUpdateCallSettings={updateCallSettings}
     />
   );
 }

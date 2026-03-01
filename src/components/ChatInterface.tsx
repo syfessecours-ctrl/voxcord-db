@@ -47,8 +47,8 @@ interface ChatInterfaceProps {
   activeChannel: string;
   activePrivateChat: string | null;
   activeVoiceChannel: string | null;
-  voiceUsers: { sid: string, username: string }[];
-  voiceStates: Record<string, { sid: string, username: string }[]>;
+  voiceUsers: { sid: string, username: string, isMuted?: boolean }[];
+  voiceStates: Record<string, { sid: string, username: string, isMuted?: boolean }[]>;
   appConfig: Record<string, string>;
   onSendMessage: (text?: string, file?: string | ArrayBuffer | null) => void;
   onSwitchChannel: (id: string) => void;
@@ -83,6 +83,13 @@ interface ChatInterfaceProps {
   onCreateServer: (name: string) => void;
   onInviteToServer: (serverId: string, targetUsername: string) => void;
   onSwitchServer: (id: string | null) => void;
+  onMuteToggle: (channelId: string, isMuted: boolean) => void;
+  onInitPrivateCall: (to: string, peerId: string) => void;
+  onAcceptPrivateCall: (to: string, peerId: string) => void;
+  onRejectPrivateCall: (to: string) => void;
+  onEndPrivateCall: (to: string) => void;
+  onSendPrivateCallSignal: (to: string, signal: any) => void;
+  onUpdateCallSettings: (soundsEnabled: boolean, ringtoneUrl?: string) => void;
 }
 
 // Helper component for remote video to handle srcObject correctly
@@ -154,9 +161,46 @@ export function ChatInterface({
   onCreateServer,
   onInviteToServer,
   onSwitchServer,
+  onMuteToggle,
+  onInitPrivateCall,
+  onAcceptPrivateCall,
+  onRejectPrivateCall,
+  onEndPrivateCall,
+  onSendPrivateCallSignal,
+  onUpdateCallSettings,
   appConfig
 }: ChatInterfaceProps) {
   const [inputText, setInputText] = useState('');
+  const [customAlert, setCustomAlert] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'alert' | 'confirm';
+    onConfirm?: () => void;
+  } | null>(null);
+
+  const showAlert = (message: string, title: string = "Avertissement") => {
+    setCustomAlert({ show: true, title, message, type: 'alert' });
+  };
+
+  const showConfirm = (message: string, onConfirm: () => void, title: string = "Confirmation") => {
+    setCustomAlert({ 
+      show: true, 
+      title, 
+      message, 
+      type: 'confirm', 
+      onConfirm
+    });
+  };
+
+  useEffect(() => {
+    const handleVoxAlert = (e: any) => {
+      showAlert(e.detail);
+    };
+    window.addEventListener('vox_alert' as any, handleVoxAlert);
+    return () => window.removeEventListener('vox_alert' as any, handleVoxAlert);
+  }, []);
+
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showFriendsView, setShowFriendsView] = useState(true);
   const [friendSearch, setFriendSearch] = useState('');
@@ -166,6 +210,23 @@ export function ChatInterface({
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [echoCancellation, setEchoCancellation] = useState(true);
   const [noiseSuppression, setNoiseSuppression] = useState(true);
+  const [isRingtoneUploading, setIsRingtoneUploading] = useState(false);
+  const ringtoneInputRef = useRef<HTMLInputElement>(null);
+  
+  const [privateCall, setPrivateCall] = useState<{
+    status: 'idle' | 'calling' | 'incoming' | 'active';
+    otherUser: string;
+    peerId?: string;
+    displayName?: string;
+    avatar?: string;
+    banner?: string;
+  }>({ status: 'idle', otherUser: '' });
+
+  const privatePeerRef = useRef<Peer | null>(null);
+  const privateMyStreamRef = useRef<MediaStream | null>(null);
+  const privateRemoteStreamRef = useRef<MediaStream | null>(null);
+  const [privateRemoteStream, setPrivateRemoteStream] = useState<MediaStream | null>(null);
+  const ringtoneRef = useRef<HTMLAudioElement | null>(null);
   const [showCreateServerModal, setShowCreateServerModal] = useState(false);
   const [newServerName, setNewServerName] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -256,6 +317,12 @@ export function ChatInterface({
   }, [activeVoiceChannel, voiceStates]);
 
   useEffect(() => {
+    if (activeVoiceChannel && isMuted) {
+      onMuteToggle(activeVoiceChannel, true);
+    }
+  }, [activeVoiceChannel]);
+
+  useEffect(() => {
     if (activeServer) {
       const server = servers.find(s => s.id === activeServer);
       if (server) {
@@ -290,8 +357,8 @@ export function ChatInterface({
   const handleServerIconFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.type === 'image/gif' && !me?.canUseGifs) {
-        alert("Vous n'avez pas l'autorisation d'utiliser des GIFs animés. Demandez au propriétaire !");
+      if (file.type === 'image/gif' && !me?.canUseGifs && !isOwner) {
+        showAlert("Vous n'avez pas l'autorisation d'utiliser des GIFs animés. Demandez au propriétaire !");
         return;
       }
       const reader = new FileReader();
@@ -305,8 +372,8 @@ export function ChatInterface({
   const handleServerBannerFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.type === 'image/gif' && !me?.canUseGifs) {
-        alert("Vous n'avez pas l'autorisation d'utiliser des GIFs animés. Demandez au propriétaire !");
+      if (file.type === 'image/gif' && !me?.canUseGifs && !isOwner) {
+        showAlert("Vous n'avez pas l'autorisation d'utiliser des GIFs animés. Demandez au propriétaire !");
         return;
       }
       const reader = new FileReader();
@@ -361,7 +428,7 @@ export function ChatInterface({
       const maxSize = hasLargeVideoPermission ? 1024 * 1024 * 1024 : 50 * 1024 * 1024; // 1GB vs 50MB
       
       if (file.size > maxSize) {
-        alert(`Fichier trop volumineux ! Limite : ${hasLargeVideoPermission ? '1 Go' : '50 Mo'}.`);
+        showAlert(`Fichier trop volumineux ! Limite : ${hasLargeVideoPermission ? '1 Go' : '50 Mo'}.`);
         return;
       }
 
@@ -389,14 +456,14 @@ export function ChatInterface({
           setUploadProgress(0);
           if (fileInputRef.current) fileInputRef.current.value = '';
         } else {
-          alert("Erreur lors de l'envoi du fichier.");
+          showAlert("Erreur lors de l'envoi du fichier.");
           setIsUploading(false);
           setUploadProgress(0);
         }
       };
 
       xhr.onerror = () => {
-        alert("Erreur réseau lors de l'envoi.");
+        showAlert("Erreur réseau lors de l'envoi.");
         setIsUploading(false);
         setUploadProgress(0);
       };
@@ -432,7 +499,7 @@ export function ChatInterface({
           setLogoUploadProgress(0);
           if (logoInputRef.current) logoInputRef.current.value = '';
         } else {
-          alert("Erreur lors de l'envoi du logo.");
+          showAlert("Erreur lors de l'envoi du logo.");
           setIsLogoUploading(false);
         }
       };
@@ -447,21 +514,21 @@ export function ChatInterface({
   };
 
   const handleClear = () => {
-    if (confirm("Voulez-vous vraiment effacer tout le salon ?")) {
+    showConfirm("Voulez-vous vraiment effacer tout le salon ?", () => {
       onClearChannel(activeChannel);
-    }
+    });
   };
 
   const handleDeleteServer = (serverId: string) => {
-    if (confirm("Voulez-vous vraiment supprimer ce serveur ? Cette action est irréversible.")) {
+    showConfirm("Voulez-vous vraiment supprimer ce serveur ? Cette action est irréversible.", () => {
       onDeleteServer(serverId);
-    }
+    });
   };
 
   const handleDeleteChannel = (channelId: string) => {
-    if (confirm("Voulez-vous vraiment supprimer ce salon ?")) {
+    showConfirm("Voulez-vous vraiment supprimer ce salon ?", () => {
       onDeleteChannel(channelId);
-    }
+    });
   };
 
   const handleLock = () => {
@@ -490,8 +557,8 @@ export function ChatInterface({
   const handleAvatarFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.type === 'image/gif' && !me?.canUseGifs) {
-        alert("Vous n'avez pas l'autorisation d'utiliser des GIFs animés. Demandez au propriétaire !");
+      if (file.type === 'image/gif' && !me?.canUseGifs && !isOwner) {
+        showAlert("Vous n'avez pas l'autorisation d'utiliser des GIFs animés. Demandez au propriétaire !");
         return;
       }
       const reader = new FileReader();
@@ -505,8 +572,8 @@ export function ChatInterface({
   const handleBannerFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.type === 'image/gif' && !me?.canUseGifs) {
-        alert("Vous n'avez pas l'autorisation d'utiliser des GIFs animés. Demandez au propriétaire !");
+      if (file.type === 'image/gif' && !me?.canUseGifs && !isOwner) {
+        showAlert("Vous n'avez pas l'autorisation d'utiliser des GIFs animés. Demandez au propriétaire !");
         return;
       }
       const reader = new FileReader();
@@ -580,6 +647,188 @@ export function ChatInterface({
     return () => window.removeEventListener('vox_voice_signal' as any, handleVoiceSignal);
   }, [activeVoiceChannel]);
 
+  // Private Call Effects
+  useEffect(() => {
+    const handleIncoming = (e: any) => {
+      const { from, peerId, displayName, avatar, banner } = e.detail;
+      setPrivateCall({ status: 'incoming', otherUser: from, peerId, displayName, avatar, banner });
+      
+      if (me?.callSoundsEnabled !== false) {
+        const ringtone = me?.ringtoneUrl || 'https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3';
+        ringtoneRef.current = new Audio(ringtone);
+        ringtoneRef.current.loop = true;
+        ringtoneRef.current.play().catch(err => console.error("Error playing ringtone:", err));
+      }
+    };
+
+    const handleAccepted = async (e: any) => {
+      const { from, peerId } = e.detail;
+      if (privateCall.status === 'calling' && privateCall.otherUser === from) {
+        setPrivateCall(prev => ({ ...prev, status: 'active', peerId }));
+        
+        // Stop calling sound if we had one (optional)
+        if (ringtoneRef.current) {
+          ringtoneRef.current.pause();
+          ringtoneRef.current = null;
+        }
+
+        // Initiate PeerJS call
+        if (privatePeerRef.current && privateMyStreamRef.current) {
+          const call = privatePeerRef.current.call(peerId, privateMyStreamRef.current);
+          call.on('stream', (remoteStream) => {
+            privateRemoteStreamRef.current = remoteStream;
+            setPrivateRemoteStream(remoteStream);
+          });
+        }
+      }
+    };
+
+    const handleRejected = (e: any) => {
+      const { from } = e.detail;
+      if (privateCall.otherUser === from) {
+        cleanupPrivateCall();
+        showAlert(`${from} a refusé l'appel.`, "Appel refusé");
+      }
+    };
+
+    const handleEnded = (e: any) => {
+      const { from } = e.detail;
+      if (privateCall.otherUser === from) {
+        cleanupPrivateCall();
+      }
+    };
+
+    const handleSignal = (e: any) => {
+      // Handle signaling if needed for PeerJS (usually PeerJS handles it, but we have it for custom logic)
+    };
+
+    window.addEventListener('vox_private_call_incoming' as any, handleIncoming);
+    window.addEventListener('vox_private_call_accepted' as any, handleAccepted);
+    window.addEventListener('vox_private_call_rejected' as any, handleRejected);
+    window.addEventListener('vox_private_call_ended' as any, handleEnded);
+    window.addEventListener('vox_private_call_signal' as any, handleSignal);
+
+    return () => {
+      window.removeEventListener('vox_private_call_incoming' as any, handleIncoming);
+      window.removeEventListener('vox_private_call_accepted' as any, handleAccepted);
+      window.removeEventListener('vox_private_call_rejected' as any, handleRejected);
+      window.removeEventListener('vox_private_call_ended' as any, handleEnded);
+      window.removeEventListener('vox_private_call_signal' as any, handleSignal);
+    };
+  }, [privateCall, me]);
+
+  const cleanupPrivateCall = () => {
+    if (ringtoneRef.current) {
+      ringtoneRef.current.pause();
+      ringtoneRef.current = null;
+    }
+    if (privateMyStreamRef.current) {
+      privateMyStreamRef.current.getTracks().forEach(track => track.stop());
+      privateMyStreamRef.current = null;
+    }
+    if (privatePeerRef.current) {
+      privatePeerRef.current.destroy();
+      privatePeerRef.current = null;
+    }
+    privateRemoteStreamRef.current = null;
+    setPrivateRemoteStream(null);
+    setPrivateCall({ status: 'idle', otherUser: '' });
+  };
+
+  const startPrivateCall = async (targetUsername: string) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      privateMyStreamRef.current = stream;
+      
+      const peer = new Peer({
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+          ]
+        }
+      });
+      privatePeerRef.current = peer;
+
+      peer.on('open', (id) => {
+        setPrivateCall({ status: 'calling', otherUser: targetUsername });
+        onInitPrivateCall(targetUsername, id);
+      });
+
+      peer.on('call', (call) => {
+        call.answer(privateMyStreamRef.current!);
+        call.on('stream', (remoteStream) => {
+          privateRemoteStreamRef.current = remoteStream;
+          setPrivateRemoteStream(remoteStream);
+        });
+      });
+
+      peer.on('error', (err) => {
+        console.error("Private Peer Error:", err);
+        cleanupPrivateCall();
+        showAlert("Erreur lors de l'appel.");
+      });
+
+    } catch (err) {
+      console.error("Error starting private call:", err);
+      showAlert("Impossible d'accéder au micro.");
+    }
+  };
+
+  const acceptCall = async () => {
+    if (privateCall.status !== 'incoming') return;
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      privateMyStreamRef.current = stream;
+      
+      if (ringtoneRef.current) {
+        ringtoneRef.current.pause();
+        ringtoneRef.current = null;
+      }
+
+      const peer = new Peer({
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+          ]
+        }
+      });
+      privatePeerRef.current = peer;
+
+      peer.on('open', (id) => {
+        setPrivateCall(prev => ({ ...prev, status: 'active' }));
+        onAcceptPrivateCall(privateCall.otherUser, id);
+      });
+
+      peer.on('call', (call) => {
+        call.answer(privateMyStreamRef.current!);
+        call.on('stream', (remoteStream) => {
+          privateRemoteStreamRef.current = remoteStream;
+          setPrivateRemoteStream(remoteStream);
+        });
+      });
+
+    } catch (err) {
+      console.error("Error accepting call:", err);
+      showAlert("Impossible d'accéder au micro.");
+      rejectCall();
+    }
+  };
+
+  const rejectCall = () => {
+    onRejectPrivateCall(privateCall.otherUser);
+    cleanupPrivateCall();
+  };
+
+  const endCall = () => {
+    onEndPrivateCall(privateCall.otherUser);
+    cleanupPrivateCall();
+  };
+
   const startVoiceChat = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -589,6 +838,11 @@ export function ChatInterface({
           autoGainControl: false,
         } 
       });
+      
+      if (stream.getAudioTracks()[0]) {
+        stream.getAudioTracks()[0].enabled = !isMuted;
+      }
+      
       myStreamRef.current = stream;
       
       const peer = new Peer({
@@ -622,7 +876,7 @@ export function ChatInterface({
 
     } catch (err) {
       console.error("[Voice] Failed to start voice chat:", err);
-      alert("Impossible d'accéder au micro. Vérifiez les permissions.");
+      showAlert("Impossible d'accéder au micro. Vérifiez les permissions.");
     }
   };
 
@@ -743,7 +997,7 @@ export function ChatInterface({
       });
     } catch (err) {
       console.error("Camera error:", err);
-      alert("Impossible d'accéder à la caméra.");
+      showAlert("Impossible d'accéder à la caméra.");
     }
   };
 
@@ -800,12 +1054,18 @@ export function ChatInterface({
   };
 
   const toggleMute = () => {
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
+    
     if (myStreamRef.current) {
       const audioTrack = myStreamRef.current.getAudioTracks()[0];
       if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setIsMuted(!audioTrack.enabled);
+        audioTrack.enabled = !newMuted;
       }
+    }
+    
+    if (activeVoiceChannel) {
+      onMuteToggle(activeVoiceChannel, newMuted);
     }
   };
 
@@ -936,7 +1196,7 @@ export function ChatInterface({
               <div className="ml-auto flex gap-1">
                 <button 
                   onClick={() => {
-                    if (confirm("Réinitialiser l'icône du serveur ?")) onResetServerIcon(activeServer);
+                    showConfirm("Réinitialiser l'icône du serveur ?", () => onResetServerIcon(activeServer!));
                   }}
                   className="p-2 hover:bg-white/10 rounded-full transition-all text-fit-text"
                   title="Réinitialiser l'icône"
@@ -945,7 +1205,7 @@ export function ChatInterface({
                 </button>
                 <button 
                   onClick={() => {
-                    if (confirm("Réinitialiser la bannière du serveur ?")) onResetServerBanner(activeServer);
+                    showConfirm("Réinitialiser la bannière du serveur ?", () => onResetServerBanner(activeServer!));
                   }}
                   className="p-2 hover:bg-white/10 rounded-full transition-all text-fit-text"
                   title="Réinitialiser la bannière"
@@ -1082,19 +1342,40 @@ export function ChatInterface({
         {/* Profile & Voice Status at bottom of sidebar */}
         <div className="p-2 bg-fit-sidebar border-t border-fit-border space-y-2">
           {activeVoiceChannel && (
-            <div className="bg-fit-surface p-3 rounded-2xl border border-fit-primary/20 shadow-sm">
+            <div 
+              onClick={() => {
+                const voiceChannel = channels.find(c => c.id === activeVoiceChannel);
+                if (voiceChannel) {
+                  onSwitchServer(voiceChannel.server_id);
+                  onSwitchChannel(voiceChannel.id);
+                }
+              }}
+              className="bg-fit-surface p-3 rounded-2xl border border-fit-primary/20 shadow-sm cursor-pointer hover:bg-fit-bg transition-all group"
+            >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2 text-fit-primary">
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                  <span className="text-[8px] font-black uppercase tracking-widest">Vocal</span>
+                  <span className="text-[8px] font-black uppercase tracking-widest group-hover:text-fit-primary-hover transition-colors">Vocal</span>
                 </div>
-                <button onClick={onLeaveVoice} className="text-fit-accent hover:scale-110 transition-all">
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onLeaveVoice();
+                  }} 
+                  className="text-fit-accent hover:scale-110 transition-all"
+                >
                   <PhoneOff size={12} />
                 </button>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold text-fit-text truncate">Connecté</span>
-                <button onClick={toggleMute} className="ml-auto text-fit-muted hover:text-fit-primary transition-all">
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleMute();
+                  }} 
+                  className="ml-auto text-fit-muted hover:text-fit-primary transition-all"
+                >
                   {isMuted ? <MicOff size={12} className="text-fit-accent" /> : <Mic size={12} />}
                 </button>
               </div>
@@ -1165,7 +1446,7 @@ export function ChatInterface({
                         if (friendSearch.trim()) {
                           onSendFriendRequest(friendSearch);
                           setFriendSearch('');
-                          alert("Demande d'ami envoyée !");
+                          showAlert("Demande d'ami envoyée !");
                         }
                       }}
                       className="absolute right-2 top-1.5 p-1.5 text-fit-primary hover:bg-fit-primary/10 rounded-xl transition-all"
@@ -1276,6 +1557,15 @@ export function ChatInterface({
                           {friends.find(f => f.username === activePrivateChat)?.displayName || activePrivateChat}
                         </span>
                         <span className="text-[9px] font-bold text-fit-muted uppercase tracking-widest">Message Direct</span>
+                      </div>
+                      <div className="ml-4 flex items-center gap-2">
+                        <button 
+                          onClick={() => startPrivateCall(activePrivateChat)}
+                          className="p-2 bg-fit-primary/10 text-fit-primary rounded-xl hover:bg-fit-primary hover:text-white transition-all shadow-sm"
+                          title="Appeler"
+                        >
+                          <Video size={18} />
+                        </button>
                       </div>
                     </>
                   ) : (
@@ -1472,9 +1762,9 @@ export function ChatInterface({
                               {/* Status Indicator Badge */}
                               <div className={cn(
                                 "absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl border-4 border-[#060606] flex items-center justify-center shadow-2xl transition-all duration-500",
-                                isMe && isMuted ? "bg-fit-accent scale-110" : "bg-emerald-500 group-hover:scale-110"
+                                (isMe ? isMuted : vu.isMuted) ? "bg-fit-accent scale-110" : "bg-emerald-500 group-hover:scale-110"
                               )}>
-                                {isMe && isMuted ? (
+                                {(isMe ? isMuted : vu.isMuted) ? (
                                   <MicOff size={18} className="text-white" />
                                 ) : (
                                   <Mic size={18} className="text-white" />
@@ -1811,6 +2101,17 @@ export function ChatInterface({
                           u.role === 'owner' ? "bg-fit-accent/5 hover:bg-fit-accent/10" : ""
                         )}
                       >
+                        {/* User Banner Background */}
+                        {u.banner && (
+                          <div 
+                            className="absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none"
+                            style={{ 
+                              backgroundImage: `url(${u.banner})`,
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center'
+                            }}
+                          />
+                        )}
                         <div className="relative flex-shrink-0">
                           <div className={cn(
                             "p-0.5 rounded-2xl",
@@ -2033,6 +2334,81 @@ export function ChatInterface({
                       noiseSuppression ? "translate-x-6" : "translate-x-0"
                     )} />
                   </button>
+                </div>
+
+                <div className="flex items-center justify-between p-6 bg-fit-bg rounded-[2rem] border border-fit-border group hover:border-fit-primary/30 transition-all">
+                  <div>
+                    <div className="text-sm font-black text-fit-text mb-1">Sons d'appel</div>
+                    <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Call Sounds</div>
+                  </div>
+                  <button 
+                    onClick={() => onUpdateCallSettings(!(me?.callSoundsEnabled !== false), me?.ringtoneUrl)}
+                    className={cn(
+                      "w-14 h-8 rounded-full transition-all relative p-1",
+                      (me?.callSoundsEnabled !== false) ? "bg-fit-primary" : "bg-fit-sidebar"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-6 h-6 bg-white rounded-full transition-all shadow-md",
+                      (me?.callSoundsEnabled !== false) ? "translate-x-6" : "translate-x-0"
+                    )} />
+                  </button>
+                </div>
+
+                <div className="p-6 bg-fit-bg rounded-[2rem] border border-fit-border">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <div className="text-sm font-black text-fit-text mb-1">Sonnerie personnalisée</div>
+                      <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Custom Ringtone</div>
+                    </div>
+                    {me?.ringtoneUrl && (
+                      <button 
+                        onClick={() => onUpdateCallSettings(me?.callSoundsEnabled !== false, undefined)}
+                        className="p-2 text-fit-muted hover:text-fit-accent transition-all"
+                        title="Réinitialiser la sonnerie"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => ringtoneInputRef.current?.click()}
+                      disabled={isRingtoneUploading}
+                      className="flex-1 py-3 bg-fit-primary/10 text-fit-primary rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-fit-primary hover:text-white transition-all disabled:opacity-50"
+                    >
+                      {isRingtoneUploading ? "Envoi..." : me?.ringtoneUrl ? "Changer Sonnerie" : "Choisir MP3"}
+                    </button>
+                    <input 
+                      type="file" 
+                      ref={ringtoneInputRef} 
+                      className="hidden" 
+                      accept="audio/mpeg,audio/mp3" 
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        
+                        setIsRingtoneUploading(true);
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        
+                        try {
+                          const res = await fetch('/api/upload', {
+                            method: 'POST',
+                            body: formData
+                          });
+                          const data = await res.json();
+                          onUpdateCallSettings(me?.callSoundsEnabled !== false, data.url);
+                        } catch (err) {
+                          console.error("Error uploading ringtone:", err);
+                          showAlert("Erreur lors de l'envoi de la sonnerie.");
+                        } finally {
+                          setIsRingtoneUploading(false);
+                        }
+                      }} 
+                    />
+                  </div>
                 </div>
 
                 <div className="p-6 bg-amber-500/10 border border-amber-500/20 rounded-[2rem] flex gap-4">
@@ -2394,7 +2770,7 @@ export function ChatInterface({
                       <button 
                         onClick={() => {
                           onSendFriendRequest(viewingUser.username);
-                          alert("Demande d'ami envoyée !");
+                          showAlert("Demande d'ami envoyée !");
                         }}
                         className="flex-1 bg-fit-bg text-fit-text py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-fit-sidebar transition-all border border-fit-border"
                       >
@@ -2735,6 +3111,153 @@ export function ChatInterface({
                   </button>
                 </div>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Custom Alert Modal */}
+      <AnimatePresence>
+        {customAlert && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="w-full max-w-md bg-fit-surface border border-fit-border rounded-[2.5rem] shadow-2xl overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 bg-fit-primary/10 rounded-2xl flex items-center justify-center text-fit-primary">
+                    <ShieldAlert size={24} />
+                  </div>
+                  <h3 className="text-xl font-black text-fit-text tracking-tight">{customAlert.title}</h3>
+                </div>
+                <p className="text-sm font-bold text-fit-text/70 leading-relaxed">
+                  {customAlert.message}
+                </p>
+              </div>
+              <div className="p-6 bg-black/20 flex justify-end gap-3">
+                {customAlert.type === 'confirm' && (
+                  <button 
+                    onClick={() => setCustomAlert(null)}
+                    className="px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-fit-muted hover:bg-white/5 transition-all"
+                  >
+                    Annuler
+                  </button>
+                )}
+                <button 
+                  onClick={() => {
+                    if (customAlert.type === 'confirm' && customAlert.onConfirm) {
+                      customAlert.onConfirm();
+                    }
+                    setCustomAlert(null);
+                  }}
+                  className="px-8 py-3 bg-fit-primary hover:bg-fit-primary-hover text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-fit-primary/20 transition-all active:scale-95"
+                >
+                  {customAlert.type === 'confirm' ? 'Confirmer' : 'OK'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Private Call Screens */}
+      <AnimatePresence>
+        {privateCall.status !== 'idle' && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-fit-bg/95 backdrop-blur-xl">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="w-full max-w-lg bg-fit-surface border border-fit-border rounded-[4rem] shadow-2xl overflow-hidden relative"
+            >
+              {/* Call Banner */}
+              <div className="h-48 w-full relative overflow-hidden">
+                {privateCall.banner ? (
+                  <img src={privateCall.banner} alt="Banner" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-fit-primary to-fit-accent opacity-20" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-fit-surface to-transparent" />
+              </div>
+
+              <div className="px-12 pb-12 -mt-16 relative flex flex-col items-center text-center">
+                {/* Avatar */}
+                <div className="relative mb-6">
+                  <div className="w-32 h-32 rounded-[3rem] bg-fit-bg border-8 border-fit-surface shadow-2xl overflow-hidden flex items-center justify-center text-fit-muted font-black text-4xl">
+                    {privateCall.avatar ? (
+                      <img src={privateCall.avatar} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      privateCall.otherUser[0]?.toUpperCase()
+                    )}
+                  </div>
+                  {privateCall.status === 'active' && (
+                    <div className="absolute -bottom-2 -right-2 bg-emerald-500 w-8 h-8 rounded-full border-4 border-fit-surface flex items-center justify-center">
+                      <div className="w-2 h-2 bg-white rounded-full animate-ping" />
+                    </div>
+                  )}
+                </div>
+
+                <h2 className="text-4xl font-black text-fit-text tracking-tighter mb-2">
+                  {privateCall.displayName || privateCall.otherUser}
+                </h2>
+                
+                <div className="mb-12">
+                  {privateCall.status === 'calling' && (
+                    <div className="flex flex-col items-center gap-2">
+                      <span className="text-fit-primary font-black text-xs uppercase tracking-[0.3em] animate-pulse">Appel en cours...</span>
+                      <p className="text-fit-muted text-xs font-bold opacity-60">En attente de réponse</p>
+                    </div>
+                  )}
+                  {privateCall.status === 'incoming' && (
+                    <div className="flex flex-col items-center gap-2">
+                      <span className="text-fit-accent font-black text-xs uppercase tracking-[0.3em] animate-bounce">Appel entrant</span>
+                      <p className="text-fit-muted text-xs font-bold opacity-60">Souhaitez-vous répondre ?</p>
+                    </div>
+                  )}
+                  {privateCall.status === 'active' && (
+                    <div className="flex flex-col items-center gap-2">
+                      <span className="text-emerald-500 font-black text-xs uppercase tracking-[0.3em]">En communication</span>
+                      <p className="text-fit-muted text-xs font-bold opacity-60">Appel sécurisé</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Call Actions */}
+                <div className="flex items-center gap-6">
+                  {privateCall.status === 'incoming' ? (
+                    <>
+                      <button 
+                        onClick={rejectCall}
+                        className="w-20 h-20 bg-fit-accent text-white rounded-full flex items-center justify-center shadow-2xl shadow-fit-accent/40 hover:scale-110 active:scale-95 transition-all"
+                      >
+                        <PhoneOff size={32} />
+                      </button>
+                      <button 
+                        onClick={acceptCall}
+                        className="w-24 h-24 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-2xl shadow-emerald-500/40 hover:scale-110 active:scale-95 transition-all"
+                      >
+                        <Video size={40} />
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      onClick={endCall}
+                      className="w-24 h-24 bg-fit-accent text-white rounded-full flex items-center justify-center shadow-2xl shadow-fit-accent/40 hover:scale-110 active:scale-95 transition-all"
+                    >
+                      <PhoneOff size={40} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Hidden audio for remote stream */}
+              {privateRemoteStream && (
+                <div className="hidden">
+                  <RemoteVideo stream={privateRemoteStream} />
+                </div>
+              )}
             </motion.div>
           </div>
         )}

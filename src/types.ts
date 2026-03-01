@@ -10,6 +10,8 @@ export interface User {
   bio?: string;
   canSendLargeVideos?: boolean;
   canUseGifs?: boolean;
+  callSoundsEnabled?: boolean;
+  ringtoneUrl?: string;
 }
 
 export interface FriendRequest {
@@ -25,6 +27,7 @@ export interface Friend {
   status: 'online' | 'offline' | 'away';
   displayName?: string;
   avatar?: string;
+  banner?: string;
 }
 
 export interface PrivateMessage {
