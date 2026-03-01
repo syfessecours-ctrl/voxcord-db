@@ -49,7 +49,10 @@ export function useSocket(username: string) {
       localStorage.setItem('vox_password', p);
     });
 
-    newSocket.on('me', (data) => setMe(data));
+    newSocket.on("me", (data) => {
+      console.log("[Socket] Received 'me' update:", data);
+      setMe(data);
+    });
 
     newSocket.on('login_error', (msg) => {
       setLoginError(msg);
@@ -264,6 +267,10 @@ export function useSocket(username: string) {
     socketRef.current?.emit('mod_set_role', { targetUsername, role });
   };
 
+  const toggleLargeVideo = (targetUsername: string) => {
+    socketRef.current?.emit('mod_toggle_large_video', targetUsername);
+  };
+
   const switchChannel = (id: string) => {
     if (socketRef.current && id !== activeChannel) {
       const channel = channels.find(c => c.id === id);
@@ -330,6 +337,7 @@ export function useSocket(username: string) {
     respondFriendRequest,
     updateStatus,
     onUpdateProfile: updateProfile,
+    onToggleLargeVideo: toggleLargeVideo,
     switchPrivateChat,
     kickUser,
     banUser,

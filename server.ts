@@ -85,7 +85,8 @@ async function initDb() {
       last_ip TEXT,
       display_name TEXT,
       avatar TEXT,
-      bio TEXT
+      bio TEXT,
+      can_send_large_videos BOOLEAN DEFAULT false
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -188,7 +189,8 @@ async function initDb() {
       "ALTER TABLE servers ADD COLUMN icon TEXT;",
       "ALTER TABLE users ADD COLUMN display_name TEXT;",
       "ALTER TABLE users ADD COLUMN avatar TEXT;",
-      "ALTER TABLE users ADD COLUMN bio TEXT;"
+      "ALTER TABLE users ADD COLUMN bio TEXT;",
+      "ALTER TABLE users ADD COLUMN can_send_large_videos BOOLEAN DEFAULT false;"
     ];
 
     for (const sql of sqliteMigrations) {
@@ -211,7 +213,7 @@ async function startServer() {
     const app = express();
     const httpServer = createServer(app);
     const io = new Server(httpServer, {
-      maxHttpBufferSize: 1e7,
+      maxHttpBufferSize: 1e9, // 1GB limit for the server
       cors: { origin: "*" }
     });
 
@@ -298,7 +300,8 @@ async function startServer() {
         status: 'online',
         displayName: userRecord.display_name,
         avatar: userRecord.avatar,
-        bio: userRecord.bio
+        bio: userRecord.bio,
+        canSendLargeVideos: !!userRecord.can_send_large_videos
       });
       socket.join('general');
       
@@ -307,7 +310,8 @@ async function startServer() {
         role: userRecord.role,
         displayName: userRecord.display_name,
         avatar: userRecord.avatar,
-        bio: userRecord.bio
+        bio: userRecord.bio,
+        canSendLargeVideos: !!userRecord.can_send_large_videos
       });
       
       // Auto-join global server members if not already
@@ -834,6 +838,35 @@ async function startServer() {
       await broadcastUserList();
       
       await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'set_role', targetUsername, `Role set to ${role}`, new Date().toISOString()]);
+    });
+
+    socket.on("mod_toggle_large_video", async (targetUsername) => {
+      const admin = users.get(socket.id);
+      if (!admin || admin.role !== 'owner') return;
+
+      const target = await getOne("SELECT can_send_large_videos FROM users WHERE username = ?", [targetUsername]);
+      if (!target) return;
+
+      const newValue = !target.can_send_large_videos;
+      await execute("UPDATE users SET can_send_large_videos = ? WHERE username = ?", [newValue, targetUsername]);
+
+      // Update online users
+      for (const [sid, u] of users.entries()) {
+        if (u.username === targetUsername) {
+          u.canSendLargeVideos = newValue;
+          io.to(sid).emit("me", { 
+            username: u.username, 
+            role: u.role,
+            displayName: u.displayName,
+            avatar: u.avatar,
+            bio: u.bio,
+            canSendLargeVideos: newValue
+          });
+        }
+      }
+      await broadcastUserList();
+      
+      await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'toggle_large_video', targetUsername, `Large video permission set to ${newValue}`, new Date().toISOString()]);
     });
 
     socket.on("mod_join_server", async (serverId) => {

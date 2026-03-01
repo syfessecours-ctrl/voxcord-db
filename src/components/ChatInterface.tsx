@@ -25,7 +25,9 @@ import {
   Mic,
   MicOff,
   PhoneOff,
-  Settings
+  Settings,
+  Camera,
+  Video
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { User, Channel, Message, Friend, FriendRequest, PrivateMessage, Server as ServerType } from '../types';
@@ -69,6 +71,7 @@ interface ChatInterfaceProps {
   onRespondFriendRequest: (requestId: number, response: 'accepted' | 'rejected') => void;
   onUpdateStatus: (status: 'online' | 'away') => void;
   onUpdateProfile: (profile: { displayName?: string, avatar?: string, bio?: string }) => void;
+  onToggleLargeVideo: (targetUsername: string) => void;
   onSwitchPrivateChat: (otherUser: string | null) => void;
   onCreateServer: (name: string) => void;
   onInviteToServer: (serverId: string, targetUsername: string) => void;
@@ -114,6 +117,7 @@ export function ChatInterface({
   onRespondFriendRequest,
   onUpdateStatus,
   onUpdateProfile,
+  onToggleLargeVideo,
   onSwitchPrivateChat,
   onCreateServer,
   onInviteToServer,
@@ -201,6 +205,14 @@ export function ChatInterface({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const isVideo = file.type.startsWith('video/');
+      const maxSize = me?.canSendLargeVideos ? 500 * 1024 * 1024 : 50 * 1024 * 1024; // 500MB vs 50MB
+      
+      if (file.size > maxSize) {
+        alert(`Fichier trop volumineux ! Limite : ${me?.canSendLargeVideos ? '500 Mo' : '50 Mo'}.`);
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = () => {
         onSendMessage(undefined, reader.result);
@@ -250,6 +262,17 @@ export function ChatInterface({
       reader.onload = () => {
         onUpdateChannelBackground(activeChannel, reader.result as string);
         setShowBackgroundModal(false);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAvatarFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setProfileForm(prev => ({ ...prev, avatar: reader.result as string }));
       };
       reader.readAsDataURL(file);
     }
@@ -995,23 +1018,28 @@ export function ChatInterface({
                   </div>
                 </div>
               ) : (
-                <>
+                <div className="flex-1 flex flex-col relative overflow-hidden">
+                  {/* Fixed Background Layer */}
+                  {currentChannel?.background_url && (
+                    <div 
+                      className="absolute inset-0 pointer-events-none z-0"
+                      style={{
+                        backgroundImage: `url(${currentChannel.background_url})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat'
+                      }}
+                    >
+                      <div className="absolute inset-0 bg-fit-bg/60" />
+                    </div>
+                  )}
+
                   {/* Messages Area */}
                   <div 
                     ref={scrollRef} 
-                    className="flex-1 overflow-y-auto p-8 space-y-8 scroll-smooth discord-scrollbar relative"
-                    style={currentChannel?.background_url ? {
-                      backgroundImage: `url(${currentChannel.background_url})`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      backgroundAttachment: 'local'
-                    } : {}}
+                    className="flex-1 overflow-y-auto p-8 space-y-8 scroll-smooth discord-scrollbar relative z-10"
                   >
-                    {/* Background Overlay to ensure readability */}
-                    {currentChannel?.background_url && (
-                      <div className="absolute inset-0 bg-fit-bg/60 pointer-events-none z-0" />
-                    )}
-                    <div className="relative z-10 space-y-8">
+                    <div className="space-y-8">
                       {displayMessages.length === 0 && (
                         <div className="h-full flex flex-col items-center justify-center text-fit-muted opacity-30">
                           <MessageSquare size={64} className="mb-4" />
@@ -1064,9 +1092,16 @@ export function ChatInterface({
                               )}>
                                 {msg.text}
                                 {msg.file && (
-                                  <div className="mt-3 rounded-xl overflow-hidden border border-white/10">
+                                  <div className="mt-3 rounded-xl overflow-hidden border border-white/10 max-w-md">
                                     {msg.file.startsWith('data:image') ? (
                                       <img src={msg.file} alt="Upload" className="max-h-64 w-full object-cover" />
+                                    ) : msg.file.startsWith('data:video') ? (
+                                      <video 
+                                        src={msg.file} 
+                                        controls 
+                                        className="max-h-96 w-full bg-black"
+                                        preload="metadata"
+                                      />
                                     ) : (
                                       <div className="p-3 bg-white/5 flex items-center gap-3">
                                         <ImageIcon size={20} />
@@ -1095,15 +1130,23 @@ export function ChatInterface({
                   </div>
 
                   {/* Input Area */}
-                  <div className="p-8 pt-0">
+                  <div className="p-8 pt-0 relative z-10">
                     <div className="bg-fit-surface rounded-[2rem] border border-fit-border p-2 shadow-xl shadow-fit-primary/5 focus-within:border-fit-primary/50 transition-all">
                       <form 
                         onSubmit={handleSendMessage}
                         className="flex items-center gap-2"
                       >
-                        <label className="w-12 h-12 flex items-center justify-center text-fit-muted hover:text-fit-primary hover:bg-fit-primary/5 rounded-full transition-all cursor-pointer">
+                        <label 
+                          className="w-12 h-12 flex items-center justify-center text-fit-muted hover:text-fit-primary hover:bg-fit-primary/5 rounded-full transition-all cursor-pointer relative group"
+                          title={`Limite d'envoi : ${me?.canSendLargeVideos ? '500 Mo' : '50 Mo'}`}
+                        >
                           <Plus size={24} />
                           <input type="file" className="hidden" onChange={handleFileUpload} />
+                          {me?.canSendLargeVideos && (
+                            <div className="absolute -top-1 -right-1 bg-emerald-500 text-white p-0.5 rounded-full shadow-lg">
+                              <Video size={8} />
+                            </div>
+                          )}
                         </label>
                         <input 
                           type="text"
@@ -1128,7 +1171,7 @@ export function ChatInterface({
                       </form>
                     </div>
                   </div>
-                </>
+                </div>
               )}
             </>
           )}
@@ -1256,6 +1299,24 @@ export function ChatInterface({
                       </button>
                     )}
                   </>
+                )}
+                
+                {isOwner && (
+                  <button 
+                    onClick={() => {
+                      onToggleLargeVideo(selectedUser.username);
+                      setSelectedUser(null);
+                    }}
+                    className={cn(
+                      "w-full flex items-center justify-between p-4 rounded-2xl transition-all font-black text-xs uppercase tracking-widest group border",
+                      selectedUser.canSendLargeVideos 
+                        ? "bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white border-emerald-500/20" 
+                        : "bg-fit-bg hover:bg-fit-sidebar text-fit-muted border-fit-border"
+                    )}
+                  >
+                    <span>{selectedUser.canSendLargeVideos ? "Retirer Large Vidéo" : "Autoriser Large Vidéo"}</span>
+                    <Video size={18} className="group-hover:scale-110 transition-transform" />
+                  </button>
                 )}
                 
                 <button 
@@ -1388,8 +1449,25 @@ export function ChatInterface({
                 </div>
 
                 <form onSubmit={handleUpdateProfile} className="space-y-6">
+                  <div className="flex flex-col items-center gap-4 mb-6">
+                    <div className="relative group">
+                      <div className="w-24 h-24 rounded-[2rem] bg-fit-bg border-4 border-fit-surface shadow-xl overflow-hidden flex items-center justify-center text-fit-muted font-black text-3xl">
+                        {profileForm.avatar ? (
+                          <img src={profileForm.avatar} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          username[0].toUpperCase()
+                        )}
+                      </div>
+                      <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-all cursor-pointer rounded-[2rem]">
+                        <Camera size={24} className="text-white" />
+                        <input type="file" className="hidden" accept="image/*" onChange={handleAvatarFileUpload} />
+                      </label>
+                    </div>
+                    <p className="text-[10px] font-black text-fit-muted uppercase tracking-widest">Cliquez pour changer la photo</p>
+                  </div>
+
                   <div>
-                    <label className="block text-[10px] font-black text-fit-muted uppercase tracking-widest mb-2">Avatar (URL)</label>
+                    <label className="block text-[10px] font-black text-fit-muted uppercase tracking-widest mb-2">Ou URL de l'avatar</label>
                     <input 
                       type="text"
                       value={profileForm.avatar}

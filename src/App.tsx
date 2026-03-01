@@ -32,6 +32,7 @@ export default function App() {
     respondFriendRequest,
     updateStatus,
     onUpdateProfile,
+    onToggleLargeVideo,
     switchPrivateChat,
     kickUser,
     banUser,
@@ -107,6 +108,7 @@ export default function App() {
       onRespondFriendRequest={respondFriendRequest}
       onUpdateStatus={updateStatus}
       onUpdateProfile={onUpdateProfile}
+      onToggleLargeVideo={onToggleLargeVideo}
       onSwitchPrivateChat={switchPrivateChat}
       onCreateServer={createServer}
       onInviteToServer={inviteToServer}

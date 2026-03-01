@@ -7,6 +7,7 @@ export interface User {
   displayName?: string;
   avatar?: string;
   bio?: string;
+  canSendLargeVideos?: boolean;
 }
 
 export interface FriendRequest {
