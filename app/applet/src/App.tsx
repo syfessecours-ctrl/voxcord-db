@@ -30,6 +30,7 @@ interface Channel {
   name: string;
   locked: boolean;
   lockMessage: string;
+  backgroundUrl?: string;
 }
 
 export default function App() {
@@ -43,6 +44,7 @@ export default function App() {
   const [activeChannelId, setActiveChannelId] = useState('general');
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [serverConfig, setServerConfig] = useState({ logoUrl: '' });
   
   // Admin Lock State
   const [showAdminPanel, setShowAdminPanel] = useState(false);
@@ -61,9 +63,10 @@ export default function App() {
       const newSocket = io();
       setSocket(newSocket);
 
-      newSocket.on('init', (data: { channels: Channel[], messages: Message[] }) => {
+      newSocket.on('init', (data: { channels: Channel[], messages: Message[], serverConfig: any }) => {
         setChannels(data.channels);
         setMessages(data.messages);
+        if (data.serverConfig) setServerConfig(data.serverConfig);
       });
 
       newSocket.on('new_message', (message: Message) => {
@@ -72,6 +75,10 @@ export default function App() {
 
       newSocket.on('channels_updated', (updatedChannels: Channel[]) => {
         setChannels(updatedChannels);
+      });
+
+      newSocket.on('config_updated', (config: any) => {
+        setServerConfig(config);
       });
 
       return () => {
@@ -141,6 +148,15 @@ export default function App() {
     });
   };
 
+  const handleUpdateChannelBackground = (channelId: string, url: string) => {
+    if (!socket || !isAdmin) return;
+    socket.emit('update_channel', {
+      channelId: channelId,
+      sender: pseudo,
+      updates: { backgroundUrl: url }
+    });
+  };
+
   const handleCreateChannel = (e: React.FormEvent) => {
     e.preventDefault();
     if (!socket || !isAdmin || !newChannelName.trim()) return;
@@ -151,6 +167,14 @@ export default function App() {
     });
     setNewChannelName('');
     setShowCreateChannel(false);
+  };
+
+  const handleUpdateLogo = (url: string) => {
+    if (!socket || !isAdmin) return;
+    socket.emit('update_server_config', {
+      sender: pseudo,
+      config: { logoUrl: url }
+    });
   };
 
   const activeChannel = channels.find(c => c.id === activeChannelId);
@@ -168,7 +192,11 @@ export default function App() {
           <div className="relative mb-8">
             <div className="w-24 h-24 rounded-3xl bg-[#7c5dfa] flex items-center justify-center shadow-[0_0_30px_rgba(124,93,250,0.6)] border-2 border-white/20 relative overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/10 to-transparent"></div>
-              <span className="text-white font-black text-4xl tracking-tighter drop-shadow-md">FC</span>
+              {serverConfig.logoUrl ? (
+                <img src={serverConfig.logoUrl} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <span className="text-white font-black text-4xl tracking-tighter drop-shadow-md">FC</span>
+              )}
               <div className="absolute -bottom-4 -right-4 w-12 h-12 bg-white/20 rounded-full blur-xl"></div>
             </div>
           </div>
@@ -220,7 +248,13 @@ export default function App() {
       {/* Sidebar */}
       <div className="w-64 bg-[#2b2b36] flex flex-col border-r border-white/5">
         <div className="p-6 flex items-center space-x-3 border-bottom border-white/5">
-          <div className="w-10 h-10 rounded-xl bg-[#7c5dfa] flex items-center justify-center font-black text-sm">FC</div>
+          <div className="w-10 h-10 rounded-xl bg-[#7c5dfa] flex items-center justify-center font-black text-sm overflow-hidden">
+            {serverConfig.logoUrl ? (
+              <img src={serverConfig.logoUrl} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              "FC"
+            )}
+          </div>
           <h1 className="font-bold tracking-tight">FITCORD</h1>
         </div>
 
@@ -349,30 +383,61 @@ export default function App() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {filteredMessages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-[#888891] space-y-4 opacity-50">
-              <MessageSquare className="w-12 h-12" />
-              <p className="text-sm italic">Aucun message ici. Commencez la conversation !</p>
-            </div>
-          ) : (
-            filteredMessages.map((msg) => (
-              <div key={msg.id} className="flex items-start space-x-4 group">
-                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white font-bold shrink-0 ${msg.isAdmin ? 'bg-[#7c5dfa]' : 'bg-white/5'}`}>
-                  {msg.sender[0].toUpperCase()}
-                </div>
-                <div>
-                  <div className="flex items-center space-x-2 mb-1">
-                    <span className={`font-bold text-sm ${msg.isAdmin ? 'text-[#7c5dfa]' : 'text-white'}`}>{msg.sender}</span>
-                    {msg.isAdmin && <Shield className="w-3 h-3 text-[#7c5dfa]" />}
-                    <span className="text-[10px] text-[#888891]">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  </div>
-                  <p className="text-[#d1d1d6] text-sm leading-relaxed">{msg.text}</p>
-                </div>
-              </div>
-            ))
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 relative">
+          {/* Channel Background */}
+          {activeChannel?.backgroundUrl && (
+            <div 
+              className="absolute inset-0 z-0 pointer-events-none opacity-20"
+              style={{ 
+                backgroundImage: `url(${activeChannel.backgroundUrl})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                filter: 'blur(2px)'
+              }}
+            />
           )}
-          <div ref={messagesEndRef} />
+          
+          <div className="relative z-10 space-y-6">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeChannelId}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-6"
+              >
+                {filteredMessages.length === 0 ? (
+                  <div className="h-[60vh] flex flex-col items-center justify-center text-[#888891] space-y-4 opacity-50">
+                    <MessageSquare className="w-12 h-12" />
+                    <p className="text-sm italic">Aucun message ici. Commencez la conversation !</p>
+                  </div>
+                ) : (
+                  filteredMessages.map((msg) => (
+                    <motion.div 
+                      key={msg.id} 
+                      initial={{ opacity: 0, x: -5 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex items-start space-x-4 group"
+                    >
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white font-bold shrink-0 ${msg.isAdmin ? 'bg-[#7c5dfa]' : 'bg-white/5'}`}>
+                        {msg.sender[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className={`font-bold text-sm ${msg.isAdmin ? 'text-[#7c5dfa]' : 'text-white'}`}>{msg.sender}</span>
+                          {msg.isAdmin && <Shield className="w-3 h-3 text-[#7c5dfa]" />}
+                          <span className="text-[10px] text-[#888891]">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <p className="text-[#d1d1d6] text-sm leading-relaxed">{msg.text}</p>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
+                <div ref={messagesEndRef} />
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
 
         {/* Input Area */}
@@ -473,6 +538,39 @@ export default function App() {
                   <p className="text-[11px] text-[#888891] leading-relaxed">
                     Le verrouillage d'un salon empêche tous les membres non-administrateurs d'envoyer des messages.
                   </p>
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-[#888891]">
+                    Personnalisation FitCord
+                  </label>
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-[#888891] ml-1">URL du Logo du Serveur</span>
+                      <input 
+                        type="text" 
+                        value={serverConfig.logoUrl}
+                        onChange={(e) => handleUpdateLogo(e.target.value)}
+                        placeholder="https://..."
+                        className="w-full bg-[#1e1e24] border border-white/5 rounded-xl px-4 py-3 text-xs focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-[#888891] ml-1">Fond du Salon #{activeChannel?.name}</span>
+                      <input 
+                        type="text" 
+                        value={activeChannel?.backgroundUrl || ''}
+                        onChange={(e) => handleUpdateChannelBackground(activeChannelId, e.target.value)}
+                        placeholder="URL de l'image (PNG/JPG)..."
+                        className="w-full bg-[#1e1e24] border border-white/5 rounded-xl px-4 py-3 text-xs focus:outline-none"
+                      />
+                    </div>
+                    
+                    <p className="text-[10px] text-[#888891] italic px-1">
+                      Les modifications s'appliquent instantanément pour tous.
+                    </p>
+                  </div>
                 </div>
               </div>
             </motion.div>

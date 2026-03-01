@@ -10,15 +10,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Supabase Configuration
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.DATABASE_URL;
+const supabaseKey = process.env.DATABASE_KEY;
 
 let supabase: any = null;
 if (supabaseUrl && supabaseKey) {
   supabase = createClient(supabaseUrl, supabaseKey);
-  console.log("[DB] Supabase client initialized.");
+  console.log("[DB] Supabase client initialized via DATABASE_URL.");
 } else {
-  console.log("[DB] Supabase credentials missing. Using in-memory storage.");
+  console.log("[DB] Supabase credentials missing (DATABASE_URL/DATABASE_KEY). Using in-memory storage.");
 }
 
 async function startServer() {
@@ -34,12 +34,15 @@ async function startServer() {
 
   // Initial State (In-memory fallback)
   let channels = [
-    { id: "general", name: "général", locked: false, lockMessage: "" },
-    { id: "fitness", name: "fitness-tips", locked: false, lockMessage: "" },
-    { id: "nutrition", name: "nutrition", locked: false, lockMessage: "" },
+    { id: "general", name: "général", locked: false, lockMessage: "", backgroundUrl: "" },
+    { id: "fitness", name: "fitness-tips", locked: false, lockMessage: "", backgroundUrl: "" },
+    { id: "nutrition", name: "nutrition", locked: false, lockMessage: "", backgroundUrl: "" },
   ];
 
   let messages: any[] = [];
+  let serverConfig = {
+    logoUrl: "" // Empty means use default FC logo
+  };
 
   // Load initial state from Supabase if available
   if (supabase) {
@@ -61,6 +64,15 @@ async function startServer() {
       if (!messagesError && dbMessages) {
         messages = dbMessages.reverse();
       }
+
+      const { data: dbConfig, error: configError } = await supabase
+        .from('config')
+        .select('*')
+        .single();
+      
+      if (!configError && dbConfig) {
+        serverConfig = dbConfig;
+      }
     } catch (err) {
       console.error("[DB] Error loading initial state:", err);
     }
@@ -70,7 +82,7 @@ async function startServer() {
     console.log("User connected:", socket.id);
 
     // Send initial state
-    socket.emit("init", { channels, messages });
+    socket.emit("init", { channels, messages, serverConfig });
 
     socket.on("send_message", async (data) => {
       const channel = channels.find(c => c.id === data.channelId);
@@ -110,7 +122,7 @@ async function startServer() {
 
       channels = channels.map(c => 
         c.id === data.channelId 
-          ? { ...c, locked: data.locked, lockMessage: data.lockMessage || "" }
+          ? { ...c, locked: data.locked, lockMessage: data.lockMessage || "", backgroundUrl: data.backgroundUrl ?? c.backgroundUrl }
           : c
       );
 
@@ -126,7 +138,31 @@ async function startServer() {
               .upsert([updatedChannel]);
           }
         } catch (err) {
-          console.error("[DB] Error persisting channel lock:", err);
+          console.error("[DB] Error persisting channel update:", err);
+        }
+      }
+    });
+
+    socket.on("update_channel", async (data) => {
+      // Server-side security check: only Vdw6200 can perform admin actions
+      if (data.sender !== 'Vdw6200') return;
+
+      channels = channels.map(c => 
+        c.id === data.channelId 
+          ? { ...c, ...data.updates }
+          : c
+      );
+
+      io.emit("channels_updated", channels);
+
+      if (supabase) {
+        try {
+          const updatedChannel = channels.find(c => c.id === data.channelId);
+          if (updatedChannel) {
+            await supabase.from('channels').upsert([updatedChannel]);
+          }
+        } catch (err) {
+          console.error("[DB] Error persisting channel update:", err);
         }
       }
     });
@@ -139,7 +175,8 @@ async function startServer() {
         id: data.name.toLowerCase().replace(/\s+/g, '-'),
         name: data.name,
         locked: false,
-        lockMessage: ""
+        lockMessage: "",
+        backgroundUrl: ""
       };
 
       // Avoid duplicates
@@ -154,6 +191,23 @@ async function startServer() {
           } catch (err) {
             console.error("[DB] Error persisting new channel:", err);
           }
+        }
+      }
+    });
+
+    socket.on("update_server_config", async (data) => {
+      // Server-side security check: only Vdw6200 can update config
+      if (data.sender !== 'Vdw6200') return;
+
+      serverConfig = { ...serverConfig, ...data.config };
+      io.emit("config_updated", serverConfig);
+
+      // Persist to Supabase
+      if (supabase) {
+        try {
+          await supabase.from('config').upsert([{ id: 1, ...serverConfig }]);
+        } catch (err) {
+          console.error("[DB] Error persisting config:", err);
         }
       }
     });
