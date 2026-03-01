@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Peer } from 'peerjs';
+import { AnimeEntryAnimation } from './AnimeEntryAnimation';
 import { 
   Hash, 
   Send, 
@@ -255,6 +256,9 @@ export function ChatInterface({
     banner: me?.banner || '',
     bio: me?.bio || ''
   });
+  const [showAnimeAnimation, setShowAnimeAnimation] = useState(false);
+  const [lastAnimatedChannel, setLastAnimatedChannel] = useState<string | null>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -345,6 +349,15 @@ export function ChatInterface({
       });
     }
   }, [me]);
+
+  useEffect(() => {
+    if (activeChannel === 'anime-zone' && lastAnimatedChannel !== 'anime-zone') {
+      setShowAnimeAnimation(true);
+      setLastAnimatedChannel('anime-zone');
+    } else if (activeChannel !== 'anime-zone') {
+      setLastAnimatedChannel(activeChannel);
+    }
+  }, [activeChannel, lastAnimatedChannel]);
 
   const handleUpdateServer = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1079,6 +1092,11 @@ export function ChatInterface({
 
   return (
     <div className="flex h-screen bg-fit-bg text-fit-text overflow-hidden font-sans w-full">
+      <AnimatePresence>
+        {showAnimeAnimation && (
+          <AnimeEntryAnimation onComplete={() => setShowAnimeAnimation(false)} />
+        )}
+      </AnimatePresence>
       {/* 1. Server Sidebar (Far Left) */}
       <div className="w-[72px] bg-fit-sidebar border-r border-fit-border flex flex-col items-center py-4 gap-3 z-40">
         <div 
