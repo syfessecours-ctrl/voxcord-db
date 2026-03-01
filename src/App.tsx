@@ -43,6 +43,7 @@ export default function App() {
     lockChannel,
     unlockChannel,
     updateChannelBackground,
+    updateChannelDescription,
     setRole,
     switchChannel,
     joinVoice,
@@ -100,6 +101,7 @@ export default function App() {
       onLockChannel={lockChannel}
       onUnlockChannel={unlockChannel}
       onUpdateChannelBackground={updateChannelBackground}
+      onUpdateChannelDescription={updateChannelDescription}
       onSetRole={setRole}
       onSendFriendRequest={sendFriendRequest}
       onRespondFriendRequest={respondFriendRequest}

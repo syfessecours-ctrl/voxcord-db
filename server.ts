@@ -74,7 +74,8 @@ async function initDb() {
       server_id TEXT,
       locked BOOLEAN DEFAULT false,
       lock_message TEXT DEFAULT 'Ce salon est verrouillé.',
-      background_url TEXT
+      background_url TEXT,
+      description TEXT
     );
 
     CREATE TABLE IF NOT EXISTS users (
@@ -161,6 +162,7 @@ async function initDb() {
       { sql: "ALTER TABLE channels ADD COLUMN locked BOOLEAN DEFAULT false;", code: "42701" },
       { sql: "ALTER TABLE channels ADD COLUMN lock_message TEXT DEFAULT 'Ce salon est verrouillé.';", code: "42701" },
       { sql: "ALTER TABLE channels ADD COLUMN background_url TEXT;", code: "42701" },
+      { sql: "ALTER TABLE channels ADD COLUMN description TEXT;", code: "42701" },
       { sql: "ALTER TABLE servers ADD COLUMN icon TEXT;", code: "42701" }
     ];
 
@@ -182,6 +184,7 @@ async function initDb() {
       "ALTER TABLE channels ADD COLUMN locked BOOLEAN DEFAULT false;",
       "ALTER TABLE channels ADD COLUMN lock_message TEXT DEFAULT 'Ce salon est verrouillé.';",
       "ALTER TABLE channels ADD COLUMN background_url TEXT;",
+      "ALTER TABLE channels ADD COLUMN description TEXT;",
       "ALTER TABLE servers ADD COLUMN icon TEXT;",
       "ALTER TABLE users ADD COLUMN display_name TEXT;",
       "ALTER TABLE users ADD COLUMN avatar TEXT;",
@@ -753,13 +756,43 @@ async function startServer() {
 
     socket.on("update_channel_background", async ({ channelId, backgroundUrl }) => {
       const user = users.get(socket.id);
-      if (!user || user.role !== 'owner') return;
+      if (!user) return;
+
+      const channel = await getOne("SELECT * FROM channels WHERE id = ?", [channelId]);
+      if (!channel) return;
+
+      const server = await getOne("SELECT * FROM servers WHERE id = ?", [channel.server_id]);
+      const isServerOwner = server && server.owner === user.username;
+      const isGlobalOwner = user.role === 'owner';
+
+      if (!isServerOwner && !isGlobalOwner) return;
 
       await execute("UPDATE channels SET background_url = ? WHERE id = ?", [backgroundUrl, channelId]);
       
+      const updatedChannel = await getOne("SELECT * FROM channels WHERE id = ?", [channelId]);
+      if (updatedChannel) {
+        io.emit("channel_updated", updatedChannel);
+      }
+    });
+
+    socket.on("update_channel_description", async ({ channelId, description }) => {
+      const user = users.get(socket.id);
+      if (!user) return;
+
       const channel = await getOne("SELECT * FROM channels WHERE id = ?", [channelId]);
-      if (channel) {
-        io.emit("channel_updated", channel);
+      if (!channel) return;
+
+      const server = await getOne("SELECT * FROM servers WHERE id = ?", [channel.server_id]);
+      const isServerOwner = server && server.owner === user.username;
+      const isGlobalOwner = user.role === 'owner';
+
+      if (!isServerOwner && !isGlobalOwner) return;
+
+      await execute("UPDATE channels SET description = ? WHERE id = ?", [description, channelId]);
+      
+      const updatedChannel = await getOne("SELECT * FROM channels WHERE id = ?", [channelId]);
+      if (updatedChannel) {
+        io.emit("channel_updated", updatedChannel);
       }
     });
 

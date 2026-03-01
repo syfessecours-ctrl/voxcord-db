@@ -48,6 +48,7 @@ export interface Channel {
   locked?: boolean;
   lock_message?: string;
   background_url?: string;
+  description?: string;
 }
 
 export interface Message {
