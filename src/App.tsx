@@ -21,6 +21,7 @@ export default function App() {
     activeVoiceChannel,
     voiceUsers,
     voiceStates,
+    appConfig,
     loginError,
     me,
     connect,
@@ -32,6 +33,7 @@ export default function App() {
     respondFriendRequest,
     updateStatus,
     onUpdateProfile,
+    onUpdateAppLogo,
     onToggleLargeVideo,
     switchPrivateChat,
     kickUser,
@@ -64,6 +66,7 @@ export default function App() {
         onLogin={handleLogin} 
         error={loginError} 
         initialUsername={username} 
+        logoUrl={appConfig.logo_url}
       />
     );
   }
@@ -85,6 +88,7 @@ export default function App() {
       activeVoiceChannel={activeVoiceChannel}
       voiceUsers={voiceUsers}
       voiceStates={voiceStates}
+      appConfig={appConfig}
       onSendMessage={sendMessage}
       onSwitchChannel={switchChannel}
       onJoinVoice={joinVoice}
@@ -108,6 +112,7 @@ export default function App() {
       onRespondFriendRequest={respondFriendRequest}
       onUpdateStatus={updateStatus}
       onUpdateProfile={onUpdateProfile}
+      onUpdateAppLogo={onUpdateAppLogo}
       onToggleLargeVideo={onToggleLargeVideo}
       onSwitchPrivateChat={switchPrivateChat}
       onCreateServer={createServer}

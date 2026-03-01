@@ -49,6 +49,7 @@ interface ChatInterfaceProps {
   activeVoiceChannel: string | null;
   voiceUsers: { sid: string, username: string }[];
   voiceStates: Record<string, { sid: string, username: string }[]>;
+  appConfig: Record<string, string>;
   onSendMessage: (text?: string, file?: string | ArrayBuffer | null) => void;
   onSwitchChannel: (id: string) => void;
   onJoinVoice: (id: string) => void;
@@ -72,6 +73,7 @@ interface ChatInterfaceProps {
   onRespondFriendRequest: (requestId: number, response: 'accepted' | 'rejected') => void;
   onUpdateStatus: (status: 'online' | 'away') => void;
   onUpdateProfile: (profile: { displayName?: string, avatar?: string, bio?: string }) => void;
+  onUpdateAppLogo: (logoUrl: string) => void;
   onToggleLargeVideo: (targetUsername: string) => void;
   onSwitchPrivateChat: (otherUser: string | null) => void;
   onCreateServer: (name: string) => void;
@@ -118,17 +120,21 @@ export function ChatInterface({
   onRespondFriendRequest,
   onUpdateStatus,
   onUpdateProfile,
+  onUpdateAppLogo,
   onToggleLargeVideo,
   onSwitchPrivateChat,
   onCreateServer,
   onInviteToServer,
-  onSwitchServer
+  onSwitchServer,
+  appConfig
 }: ChatInterfaceProps) {
   const [inputText, setInputText] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showFriendsView, setShowFriendsView] = useState(true);
   const [friendSearch, setFriendSearch] = useState('');
   const [isMuted, setIsMuted] = useState(false);
+  const [isCameraOn, setIsCameraOn] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [echoCancellation, setEchoCancellation] = useState(true);
   const [noiseSuppression, setNoiseSuppression] = useState(true);
@@ -146,6 +152,8 @@ export function ChatInterface({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
+  const [logoUploadProgress, setLogoUploadProgress] = useState(0);
+  const [isLogoUploading, setIsLogoUploading] = useState(false);
   const [profileForm, setProfileForm] = useState({
     displayName: me?.displayName || '',
     avatar: me?.avatar || '',
@@ -153,8 +161,10 @@ export function ChatInterface({
   });
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const peerRef = useRef<Peer | null>(null);
   const myStreamRef = useRef<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
   const callsRef = useRef<Record<string, any>>({});
   const remoteStreamsRef = useRef<Record<string, MediaStream>>({});
   const [remoteStreams, setRemoteStreams] = useState<number>(0); // Trigger re-render
@@ -259,6 +269,42 @@ export function ChatInterface({
         alert("Erreur réseau lors de l'envoi.");
         setIsUploading(false);
         setUploadProgress(0);
+      };
+
+      xhr.send(formData);
+    }
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && isOwner) {
+      setIsLogoUploading(true);
+      setLogoUploadProgress(0);
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload', true);
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          setLogoUploadProgress(percentComplete);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          const response = JSON.parse(xhr.responseText);
+          onUpdateAppLogo(response.url);
+          setIsLogoUploading(false);
+          setLogoUploadProgress(0);
+          if (logoInputRef.current) logoInputRef.current.value = '';
+        } else {
+          alert("Erreur lors de l'envoi du logo.");
+          setIsLogoUploading(false);
+        }
       };
 
       xhr.send(formData);
@@ -391,7 +437,7 @@ export function ChatInterface({
         audio: {
           echoCancellation,
           noiseSuppression,
-          autoGainControl: false, // Disabling this to fix "rollercoaster" volume swings
+          autoGainControl: false,
         } 
       });
       myStreamRef.current = stream;
@@ -431,6 +477,101 @@ export function ChatInterface({
     }
   };
 
+  const handleScreenShare = async () => {
+    if (!activeVoiceChannel) return;
+    try {
+      if (isScreenSharing) {
+        stopScreenShare();
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      screenStreamRef.current = stream;
+      setIsScreenSharing(true);
+
+      const videoTrack = stream.getVideoTracks()[0];
+      
+      // Replace or add video track in all active calls
+      Object.values(callsRef.current).forEach((call: any) => {
+        const senders = call.peerConnection.getSenders();
+        const videoSender = senders.find((s: any) => s.track?.kind === 'video');
+        if (videoSender) {
+          videoSender.replaceTrack(videoTrack);
+        } else {
+          call.peerConnection.addTrack(videoTrack, stream);
+        }
+      });
+
+      videoTrack.onended = () => {
+        stopScreenShare();
+      };
+    } catch (err) {
+      console.error("Screen share error:", err);
+    }
+  };
+
+  const stopScreenShare = () => {
+    screenStreamRef.current?.getTracks().forEach(track => track.stop());
+    screenStreamRef.current = null;
+    setIsScreenSharing(false);
+    
+    // Revert to camera if it was on, or just remove video track
+    Object.values(callsRef.current).forEach((call: any) => {
+      const senders = call.peerConnection.getSenders();
+      const videoSender = senders.find((s: any) => s.track?.kind === 'video');
+      if (videoSender) {
+        if (isCameraOn && myStreamRef.current?.getVideoTracks()[0]) {
+          videoSender.replaceTrack(myStreamRef.current.getVideoTracks()[0]);
+        } else {
+          call.peerConnection.removeTrack(videoSender);
+        }
+      }
+    });
+  };
+
+  const handleCamera = async () => {
+    if (!activeVoiceChannel) return;
+    try {
+      if (isCameraOn) {
+        const videoTrack = myStreamRef.current?.getVideoTracks()[0];
+        if (videoTrack) {
+          videoTrack.stop();
+          myStreamRef.current?.removeTrack(videoTrack);
+        }
+        setIsCameraOn(false);
+        
+        Object.values(callsRef.current).forEach((call: any) => {
+          const senders = call.peerConnection.getSenders();
+          const videoSender = senders.find((s: any) => s.track?.kind === 'video');
+          if (videoSender && !isScreenSharing) {
+            call.peerConnection.removeTrack(videoSender);
+          }
+        });
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const videoTrack = stream.getVideoTracks()[0];
+      myStreamRef.current?.addTrack(videoTrack);
+      setIsCameraOn(true);
+
+      if (!isScreenSharing) {
+        Object.values(callsRef.current).forEach((call: any) => {
+          const senders = call.peerConnection.getSenders();
+          const videoSender = senders.find((s: any) => s.track?.kind === 'video');
+          if (videoSender) {
+            videoSender.replaceTrack(videoTrack);
+          } else {
+            call.peerConnection.addTrack(videoTrack, myStreamRef.current!);
+          }
+        });
+      }
+    } catch (err) {
+      console.error("Camera error:", err);
+      alert("Impossible d'accéder à la caméra.");
+    }
+  };
+
   const addRemoteStream = (id: string, stream: MediaStream) => {
     remoteStreamsRef.current[id] = stream;
     setRemoteStreams(prev => prev + 1);
@@ -443,9 +584,13 @@ export function ChatInterface({
   const stopVoiceChat = () => {
     myStreamRef.current?.getTracks().forEach(track => track.stop());
     myStreamRef.current = null;
+    screenStreamRef.current?.getTracks().forEach(track => track.stop());
+    screenStreamRef.current = null;
     peerRef.current?.destroy();
     peerRef.current = null;
     setMyPeerId(null);
+    setIsCameraOn(false);
+    setIsScreenSharing(false);
     signaledUsersRef.current.clear();
     callsRef.current = {};
     remoteStreamsRef.current = {};
@@ -503,7 +648,7 @@ export function ChatInterface({
           title="Accueil"
         >
           <img 
-            src="https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg" 
+            src={appConfig.logo_url || "https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg"} 
             alt="FitCord" 
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
@@ -1150,20 +1295,28 @@ export function ChatInterface({
                       </button>
 
                       <button 
-                        className="w-16 h-16 rounded-[1.8rem] bg-white/5 text-white flex items-center justify-center hover:bg-white/10 hover:scale-110 transition-all duration-500 shadow-2xl group/btn"
+                        onClick={handleCamera}
+                        className={cn(
+                          "w-16 h-16 rounded-[1.8rem] flex items-center justify-center transition-all duration-500 shadow-2xl group/btn",
+                          isCameraOn ? "bg-fit-primary text-white" : "bg-white/5 text-white hover:bg-white/10 hover:scale-110"
+                        )}
                       >
                         <Video size={28} />
                         <div className="absolute -top-14 left-1/2 -translate-x-1/2 px-4 py-2 bg-fit-surface text-[10px] font-black uppercase tracking-widest rounded-xl opacity-0 group-hover/btn:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap border border-fit-border shadow-2xl translate-y-2 group-hover/btn:translate-y-0">
-                          Caméra
+                          {isCameraOn ? "Couper caméra" : "Activer caméra"}
                         </div>
                       </button>
 
                       <button 
-                        className="w-16 h-16 rounded-[1.8rem] bg-white/5 text-white flex items-center justify-center hover:bg-white/10 hover:scale-110 transition-all duration-500 shadow-2xl group/btn"
+                        onClick={handleScreenShare}
+                        className={cn(
+                          "w-16 h-16 rounded-[1.8rem] flex items-center justify-center transition-all duration-500 shadow-2xl group/btn",
+                          isScreenSharing ? "bg-fit-primary text-white" : "bg-white/5 text-white hover:bg-white/10 hover:scale-110"
+                        )}
                       >
                         <Monitor size={28} />
                         <div className="absolute -top-14 left-1/2 -translate-x-1/2 px-4 py-2 bg-fit-surface text-[10px] font-black uppercase tracking-widest rounded-xl opacity-0 group-hover/btn:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap border border-fit-border shadow-2xl translate-y-2 group-hover/btn:translate-y-0">
-                          Partage d'écran
+                          {isScreenSharing ? "Arrêter partage" : "Partage d'écran"}
                         </div>
                       </button>
 
@@ -1626,6 +1779,42 @@ export function ChatInterface({
                     Les changements prendront effet lors de votre prochaine connexion vocale.
                   </p>
                 </div>
+
+                {isOwner && (
+                  <div className="p-6 bg-fit-bg rounded-[2rem] border border-fit-border">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <div className="text-sm font-black text-fit-text mb-1">Logo FitCord</div>
+                        <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Custom Branding</div>
+                      </div>
+                      <div className="w-12 h-12 bg-fit-surface rounded-xl overflow-hidden border border-fit-border">
+                        <img 
+                          src={appConfig.logo_url || "https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg"} 
+                          alt="Logo" 
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => logoInputRef.current?.click()}
+                        disabled={isLogoUploading}
+                        className="flex-1 py-3 bg-fit-primary/10 text-fit-primary rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-fit-primary hover:text-white transition-all disabled:opacity-50"
+                      >
+                        {isLogoUploading ? `Envoi ${logoUploadProgress}%` : "Changer Logo"}
+                      </button>
+                      <input 
+                        type="file" 
+                        ref={logoInputRef} 
+                        className="hidden" 
+                        accept="image/*" 
+                        onChange={handleLogoUpload} 
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <button 
                   onClick={() => setShowSettingsModal(false)}

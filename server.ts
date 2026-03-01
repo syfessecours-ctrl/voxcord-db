@@ -138,6 +138,11 @@ async function initDb() {
       file TEXT,
       timestamp TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS app_config (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
   `;
 
   if (isPostgres) {
@@ -206,6 +211,7 @@ async function initDb() {
 
   await execute("INSERT INTO servers (id, name, owner, timestamp) VALUES ('fitcord-global', 'FitCord Global', 'system', '2026-02-27T00:00:00.000Z') ON CONFLICT DO NOTHING");
   await execute("INSERT INTO channels (id, name, type, server_id) VALUES ('general', 'général', 'text', 'fitcord-global') ON CONFLICT DO NOTHING");
+  await execute("INSERT INTO app_config (key, value) VALUES ('logo_url', 'https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg') ON CONFLICT DO NOTHING");
 }
 
 const OWNER_USERNAME = "Vdw6200";
@@ -260,6 +266,15 @@ async function startServer() {
 
   const users = new Map(); // socket.id -> user info
   const voiceStates = new Map(); // channelId -> Set of { sid, username }
+
+  const getAppConfig = async () => {
+    const rows = await query("SELECT * FROM app_config");
+    const config: Record<string, string> = {};
+    rows.forEach((row: any) => {
+      config[row.key] = row.value;
+    });
+    return config;
+  };
 
   const broadcastUserList = async () => {
     // Get unique users by username to avoid duplicates
@@ -390,6 +405,9 @@ async function startServer() {
       for (const [channelId, userSet] of voiceStates.entries()) {
         socket.emit("voice_state_update", { channelId, users: Array.from(userSet) });
       }
+
+      const appConfig = await getAppConfig();
+      socket.emit("app_config", appConfig);
 
       await broadcastUserList();
       
@@ -960,6 +978,15 @@ async function startServer() {
       io.emit("channel_deleted", channelId);
       
       await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'delete_channel', channelId, 'Suppression par owner', new Date().toISOString()]);
+    });
+
+    socket.on("update_app_logo", async (logoUrl) => {
+      const user = users.get(socket.id);
+      if (!user || user.role !== 'owner') return;
+
+      await execute("INSERT INTO app_config (key, value) VALUES ('logo_url', ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [logoUrl]);
+      const appConfig = await getAppConfig();
+      io.emit("app_config", appConfig);
     });
 
     socket.on("disconnect", async () => {

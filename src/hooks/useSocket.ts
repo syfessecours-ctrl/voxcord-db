@@ -19,6 +19,7 @@ export function useSocket(username: string) {
   const [activeVoiceChannel, setActiveVoiceChannel] = useState<string | null>(null);
   const [voiceUsers, setVoiceUsers] = useState<{ sid: string, username: string }[]>([]);
   const [voiceStates, setVoiceStates] = useState<Record<string, { sid: string, username: string }[]>>({});
+  const [appConfig, setAppConfig] = useState<Record<string, string>>({});
   const [loginError, setLoginError] = useState<string | null>(null);
   const [me, setMe] = useState<User | null>(null);
   
@@ -134,6 +135,10 @@ export function useSocket(username: string) {
     newSocket.on('voice_state_update', ({ channelId, users }) => {
       console.log(`[Socket] Voice state update for ${channelId}:`, users);
       setVoiceStates(prev => ({ ...prev, [channelId]: users }));
+    });
+
+    newSocket.on('app_config', (config) => {
+      setAppConfig(config);
     });
 
     newSocket.on('voice_signal', (data) => {
@@ -301,6 +306,15 @@ export function useSocket(username: string) {
     setActiveVoiceChannel(null);
     setVoiceUsers([]);
     socketRef.current?.emit('leave_voice');
+    // Switch back to general or a sensible default to avoid the "stuck" selection
+    if (activeChannelRef.current && channels.find(c => c.id === activeChannelRef.current)?.type === 'voice') {
+      setActiveChannel('general');
+      socketRef.current?.emit('switch_channel', 'general');
+    }
+  };
+
+  const updateAppLogo = (logoUrl: string) => {
+    socketRef.current?.emit('update_app_logo', logoUrl);
   };
 
   const sendVoiceSignal = (to: string, signal: any) => {
@@ -329,6 +343,7 @@ export function useSocket(username: string) {
     activeVoiceChannel,
     voiceUsers,
     voiceStates,
+    appConfig,
     loginError,
     me,
     connect,
@@ -340,6 +355,7 @@ export function useSocket(username: string) {
     respondFriendRequest,
     updateStatus,
     onUpdateProfile: updateProfile,
+    onUpdateAppLogo: updateAppLogo,
     onToggleLargeVideo: toggleLargeVideo,
     switchPrivateChat,
     kickUser,

@@ -6,9 +6,10 @@ interface LoginProps {
   onLogin: (u: string, p: string) => void;
   error: string | null;
   initialUsername: string;
+  logoUrl?: string;
 }
 
-export function Login({ onLogin, error, initialUsername }: LoginProps) {
+export function Login({ onLogin, error, initialUsername, logoUrl }: LoginProps) {
   const [username, setUsername] = useState(initialUsername);
   const [password, setPassword] = useState('');
 
@@ -16,6 +17,8 @@ export function Login({ onLogin, error, initialUsername }: LoginProps) {
     e.preventDefault();
     onLogin(username, password);
   };
+
+  const defaultLogo = "https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg";
 
   return (
     <div className="min-h-screen bg-fit-bg flex items-center justify-center p-4">
@@ -27,7 +30,7 @@ export function Login({ onLogin, error, initialUsername }: LoginProps) {
         <div className="flex flex-col items-center mb-10">
           <div className="w-20 h-20 bg-fit-primary rounded-3xl flex items-center justify-center text-white mb-6 shadow-lg shadow-indigo-200 overflow-hidden">
             <img 
-              src="https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg" 
+              src={logoUrl || defaultLogo} 
               alt="FitCord Logo" 
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
