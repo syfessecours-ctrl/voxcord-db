@@ -687,7 +687,8 @@ export function ChatInterface({
       });
       
       if (me?.callSoundsEnabled !== false) {
-        const ringtone = getDirectUrl(me?.ringtoneUrl || appConfig.default_ringtone || 'https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3');
+        // Prioritize official ringtone if set in appConfig
+        const ringtone = getDirectUrl(appConfig.default_ringtone || me?.ringtoneUrl || 'https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3');
         ringtoneRef.current = new Audio(ringtone);
         ringtoneRef.current.loop = true;
         ringtoneRef.current.play().catch(err => console.error("Error playing ringtone:", err));
@@ -3253,14 +3254,14 @@ export function ChatInterface({
                   {/* Call Background with Fade */}
                   <div className="absolute inset-0 z-0">
                     <AnimatePresence mode="wait">
-                      {(privateCall.banner || appConfig.default_call_banner) && (
+                      {(appConfig.default_call_banner || privateCall.banner) && (
                         <motion.img
                           key="banner"
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 0.6 }}
                           exit={{ opacity: 0 }}
                           transition={{ duration: 1 }}
-                          src={getDirectUrl(privateCall.banner || appConfig.default_call_banner)}
+                          src={getDirectUrl(appConfig.default_call_banner || privateCall.banner)}
                           alt="Background"
                           className="w-full h-full object-cover"
                           referrerPolicy="no-referrer"
