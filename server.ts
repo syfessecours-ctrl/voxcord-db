@@ -71,7 +71,7 @@ async function initDb() {
       name TEXT,
       type TEXT,
       server_id TEXT,
-      locked BOOLEAN DEFAULT 0,
+      locked BOOLEAN DEFAULT false,
       lock_message TEXT DEFAULT 'Ce salon est verrouillé.'
     );
 
@@ -175,7 +175,7 @@ async function initDb() {
     // Migrations for SQLite
     const sqliteMigrations = [
       "ALTER TABLE channels ADD COLUMN server_id TEXT;",
-      "ALTER TABLE channels ADD COLUMN locked BOOLEAN DEFAULT 0;",
+      "ALTER TABLE channels ADD COLUMN locked BOOLEAN DEFAULT false;",
       "ALTER TABLE channels ADD COLUMN lock_message TEXT DEFAULT 'Ce salon est verrouillé.';",
       "ALTER TABLE users ADD COLUMN display_name TEXT;",
       "ALTER TABLE users ADD COLUMN avatar TEXT;",
@@ -717,7 +717,7 @@ async function startServer() {
       const user = users.get(socket.id);
       if (!user || user.role !== 'owner') return;
 
-      await execute("UPDATE channels SET locked = 1, lock_message = ? WHERE id = ?", [lockMessage, channelId]);
+      await execute("UPDATE channels SET locked = ?, lock_message = ? WHERE id = ?", [true, lockMessage, channelId]);
       
       const channel = await getOne("SELECT * FROM channels WHERE id = ?", [channelId]);
       if (channel) {
@@ -729,7 +729,7 @@ async function startServer() {
       const user = users.get(socket.id);
       if (!user || user.role !== 'owner') return;
 
-      await execute("UPDATE channels SET locked = 0 WHERE id = ?", [channelId]);
+      await execute("UPDATE channels SET locked = ? WHERE id = ?", [false, channelId]);
       
       const channel = await getOne("SELECT * FROM channels WHERE id = ?", [channelId]);
       if (channel) {
