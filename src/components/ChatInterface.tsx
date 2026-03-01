@@ -258,42 +258,27 @@ export function ChatInterface({
   useEffect(() => {
     const currentRingtone = me?.ringtoneUrl || appConfig.default_ringtone || KALASH_RINGTONE_URL;
     const directUrl = getDirectUrl(currentRingtone);
-    console.log("[Audio] Initializing ringtone with URL:", directUrl);
+    console.log("[Audio] Setting ringtone source:", directUrl);
     
-    const audio = new Audio(directUrl);
-    audio.loop = true;
-    audio.volume = 0.8;
-    ringtoneAudioRef.current = audio;
-
-    // If it was already playing, start the new audio immediately
-    if (isPlayingRingtone) {
-      audio.play().catch(err => console.error("[Audio] Play failed on re-init:", err));
+    if (ringtoneAudioRef.current) {
+      const wasPlaying = !ringtoneAudioRef.current.paused;
+      ringtoneAudioRef.current.src = directUrl;
+      ringtoneAudioRef.current.load();
+      if (wasPlaying || isPlayingRingtone) {
+        ringtoneAudioRef.current.play().catch(err => console.error("[Audio] Play failed after src change:", err));
+      }
     }
-
-    return () => {
-      console.log("[Audio] Cleaning up ringtone");
-      audio.pause();
-      audio.src = "";
-    };
   }, [me?.ringtoneUrl, appConfig.default_ringtone]);
 
-  // Handle ringtone playback
+  // Handle ringtone playback state changes
   useEffect(() => {
-    if (!ringtoneAudioRef.current) {
-      console.warn("[Audio] Ringtone audio object not ready");
-      return;
-    }
+    if (!ringtoneAudioRef.current) return;
 
     if (isPlayingRingtone) {
       console.log("[Audio] Attempting to play ringtone...");
-      const playPromise = ringtoneAudioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.then(() => {
-          console.log("[Audio] Ringtone playing successfully");
-        }).catch(error => {
-          console.error("[Audio] Play failed (likely autoplay restriction):", error);
-        });
-      }
+      ringtoneAudioRef.current.play().catch(error => {
+        console.error("[Audio] Play failed (autoplay policy):", error);
+      });
     } else {
       console.log("[Audio] Pausing ringtone");
       ringtoneAudioRef.current.pause();
@@ -796,34 +781,38 @@ export function ChatInterface({
 
     // Global click listener to unlock audio context for ringtones
     const unlockAudio = () => {
+      console.log("[Audio] User interaction detected, unlocking audio...");
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       if (audioCtx.state === 'suspended') {
         audioCtx.resume();
       }
-      // Play a tiny silent buffer
+      
+      // Play a tiny silent buffer to unlock the AudioContext
       const buffer = audioCtx.createBuffer(1, 1, 22050);
       const source = audioCtx.createBufferSource();
       source.buffer = buffer;
       source.connect(audioCtx.destination);
       source.start(0);
       
-      // Also "unlock" the ringtone audio object by playing/pausing it
+      // CRITICAL: Unlock the specific ringtone element
       if (ringtoneAudioRef.current) {
         ringtoneAudioRef.current.play().then(() => {
           ringtoneAudioRef.current?.pause();
           ringtoneAudioRef.current!.currentTime = 0;
-        }).catch(() => {
-          // Ignore errors, we're just trying to unlock
+          console.log("[Audio] Ringtone element successfully unlocked");
+        }).catch(err => {
+          console.warn("[Audio] Failed to unlock ringtone element:", err);
         });
       }
       
       window.removeEventListener('click', unlockAudio);
       window.removeEventListener('keydown', unlockAudio);
-      console.log("[Audio] Context and ringtone object unlocked");
+      window.removeEventListener('touchstart', unlockAudio);
     };
 
     window.addEventListener('click', unlockAudio);
     window.addEventListener('keydown', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
 
     window.addEventListener('vox_private_call_incoming' as any, handleIncoming);
     window.addEventListener('vox_private_call_accepted' as any, handleAccepted);
@@ -3490,7 +3479,12 @@ export function ChatInterface({
       </AnimatePresence>
 
       {/* Hidden Audio Player for Ringtone - Using native HTML5 Audio for better reliability */}
-      {/* The audio is managed via ringtoneAudioRef in the useEffect */}
+      <audio 
+        ref={ringtoneAudioRef}
+        className="hidden"
+        preload="auto"
+        loop
+      />
     </div>
   );
 }
