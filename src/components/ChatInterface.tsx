@@ -115,6 +115,15 @@ function RemoteVideo({ stream, className }: { stream: MediaStream, className?: s
   );
 }
 
+// Helper to ensure Dropbox links are direct
+const getDirectUrl = (url: string) => {
+  if (!url) return url;
+  if (url.includes('dropbox.com')) {
+    return url.replace(/\?dl=[01]/, '?raw=1').replace(/&dl=[01]/, '&raw=1');
+  }
+  return url;
+};
+
 export function ChatInterface({
   username,
   users,
@@ -667,10 +676,18 @@ export function ChatInterface({
   useEffect(() => {
     const handleIncoming = (e: any) => {
       const { from, peerId, displayName, avatar, banner } = e.detail;
-      setPrivateCall({ status: 'incoming', otherUser: from, peerId, displayName, avatar, banner, isMinimized: false });
+      setPrivateCall({ 
+        status: 'incoming', 
+        otherUser: from, 
+        peerId, 
+        displayName, 
+        avatar: getDirectUrl(avatar), 
+        banner: getDirectUrl(banner), 
+        isMinimized: false 
+      });
       
       if (me?.callSoundsEnabled !== false) {
-        const ringtone = me?.ringtoneUrl || appConfig.default_ringtone || 'https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3';
+        const ringtone = getDirectUrl(me?.ringtoneUrl || appConfig.default_ringtone || 'https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3');
         ringtoneRef.current = new Audio(ringtone);
         ringtoneRef.current.loop = true;
         ringtoneRef.current.play().catch(err => console.error("Error playing ringtone:", err));
@@ -3225,7 +3242,7 @@ export function ChatInterface({
               {privateCall.isMinimized ? (
                 <div className="w-full h-full flex items-center justify-center bg-fit-primary text-white relative">
                   {privateCall.avatar ? (
-                    <img src={privateCall.avatar} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <img src={getDirectUrl(privateCall.avatar)} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   ) : (
                     <Video size={24} />
                   )}
@@ -3236,38 +3253,18 @@ export function ChatInterface({
                   {/* Call Background with Fade */}
                   <div className="absolute inset-0 z-0">
                     <AnimatePresence mode="wait">
-                      {privateCall.status === 'calling' || privateCall.status === 'incoming' ? (
+                      {(privateCall.banner || appConfig.default_call_banner) && (
                         <motion.img
-                          key="calling-gif"
+                          key="banner"
                           initial={{ opacity: 0 }}
-                          animate={{ opacity: 0.4 }}
+                          animate={{ opacity: 0.6 }}
                           exit={{ opacity: 0 }}
                           transition={{ duration: 1 }}
-                          src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJ6eW56eW56eW56eW56eW56eW56eW56eW56eW56eW56eW56JmVwPXYxX2ludGVybmFsX2dpZl9ieV9pZCZjdD1n/3o7TKMGpxxH6A5v7m8/giphy.gif"
-                          alt="Calling"
+                          src={getDirectUrl(privateCall.banner || appConfig.default_call_banner)}
+                          alt="Background"
                           className="w-full h-full object-cover"
                           referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=1000";
-                          }}
                         />
-                      ) : (
-                        (privateCall.banner || appConfig.default_call_banner) && (
-                          <motion.img
-                            key="banner"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 0.6 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 1 }}
-                            src={privateCall.banner || appConfig.default_call_banner}
-                            alt="Background"
-                            className="w-full h-full object-cover"
-                            referrerPolicy="no-referrer"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000";
-                            }}
-                          />
-                        )
                       )}
                     </AnimatePresence>
                     <div className="absolute inset-0 bg-gradient-to-b from-fit-surface/60 via-fit-surface/80 to-fit-surface" />
@@ -3289,7 +3286,7 @@ export function ChatInterface({
                     <div className="relative mb-6">
                       <div className="w-28 h-28 rounded-[2.5rem] bg-fit-bg border-4 border-fit-surface shadow-2xl overflow-hidden flex items-center justify-center text-fit-muted font-black text-4xl">
                         {privateCall.avatar ? (
-                          <img src={privateCall.avatar} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <img src={getDirectUrl(privateCall.avatar)} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
                           privateCall.otherUser[0]?.toUpperCase()
                         )}
