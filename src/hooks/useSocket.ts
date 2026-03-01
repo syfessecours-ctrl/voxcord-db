@@ -252,6 +252,10 @@ export function useSocket(username: string) {
     socketRef.current?.emit('unlock_channel', channelId);
   };
 
+  const updateChannelBackground = (channelId: string, backgroundUrl: string) => {
+    socketRef.current?.emit('update_channel_background', { channelId, backgroundUrl });
+  };
+
   const setRole = (targetUsername: string, role: string) => {
     socketRef.current?.emit('mod_set_role', { targetUsername, role });
   };
@@ -332,6 +336,7 @@ export function useSocket(username: string) {
     joinServer,
     lockChannel,
     unlockChannel,
+    updateChannelBackground,
     setRole,
     switchChannel,
     joinVoice,

@@ -37,6 +37,7 @@ export interface Server {
   id: string;
   name: string;
   owner: string;
+  icon?: string;
 }
 
 export interface Channel {
@@ -46,6 +47,7 @@ export interface Channel {
   server_id: string;
   locked?: boolean;
   lock_message?: string;
+  background_url?: string;
 }
 
 export interface Message {

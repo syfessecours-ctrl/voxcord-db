@@ -62,6 +62,7 @@ interface ChatInterfaceProps {
   onJoinServer: (serverId: string) => void;
   onLockChannel: (channelId: string, lockMessage: string) => void;
   onUnlockChannel: (channelId: string) => void;
+  onUpdateChannelBackground: (channelId: string, backgroundUrl: string) => void;
   onSetRole: (targetUsername: string, role: string) => void;
   onSendFriendRequest: (targetUsername: string) => void;
   onRespondFriendRequest: (requestId: number, response: 'accepted' | 'rejected') => void;
@@ -105,6 +106,7 @@ export function ChatInterface({
   onJoinServer,
   onLockChannel,
   onUnlockChannel,
+  onUpdateChannelBackground,
   onSetRole,
   onSendFriendRequest,
   onRespondFriendRequest,
@@ -127,6 +129,8 @@ export function ChatInterface({
   const [newServerName, setNewServerName] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
+  const [showBackgroundModal, setShowBackgroundModal] = useState(false);
+  const [newBackgroundUrl, setNewBackgroundUrl] = useState('');
   const [lockMessage, setLockMessage] = useState('Seul les modérateurs peuvent écrire ici');
   const [inviteTarget, setInviteTarget] = useState('');
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -227,6 +231,12 @@ export function ChatInterface({
   const handleLock = () => {
     onLockChannel(activeChannel, lockMessage);
     setShowLockModal(false);
+  };
+
+  const handleUpdateBackground = () => {
+    onUpdateChannelBackground(activeChannel, newBackgroundUrl);
+    setShowBackgroundModal(false);
+    setNewBackgroundUrl('');
   };
 
   useEffect(() => {
@@ -414,25 +424,29 @@ export function ChatInterface({
         <div className="w-8 h-[2px] bg-fit-border rounded-full mx-auto" />
 
         <div className="flex-1 w-full overflow-y-auto flex flex-col items-center gap-2 px-2 discord-scrollbar">
-          {servers.map(srv => (
-            <div 
-              key={srv.id}
-              onClick={() => {
-                onSwitchServer(srv.id);
-                setShowFriendsView(false);
-              }}
-              className={cn(
-                "w-12 h-12 rounded-[24px] flex items-center justify-center transition-all cursor-pointer group relative",
-                activeServer === srv.id ? "bg-fit-primary text-white rounded-[16px]" : "bg-fit-surface text-fit-muted hover:bg-fit-primary hover:text-white hover:rounded-[16px]"
-              )}
-              title={srv.name}
-            >
-              <div className="font-black text-xs">
-                {srv.name.substring(0, 2).toUpperCase()}
-              </div>
-              {activeServer === srv.id && (
-                <div className="absolute -left-2 w-1 h-8 bg-fit-primary rounded-r-full" />
-              )}
+              {servers.map(srv => (
+                <div 
+                  key={srv.id}
+                  onClick={() => {
+                    onSwitchServer(srv.id);
+                    setShowFriendsView(false);
+                  }}
+                  className={cn(
+                    "w-12 h-12 rounded-[24px] flex items-center justify-center transition-all cursor-pointer group relative overflow-hidden",
+                    activeServer === srv.id ? "bg-fit-primary text-white rounded-[16px]" : "bg-fit-surface text-fit-muted hover:bg-fit-primary hover:text-white hover:rounded-[16px]"
+                  )}
+                  title={srv.name}
+                >
+                  {srv.icon ? (
+                    <img src={srv.icon} alt={srv.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <div className="font-black text-xs">
+                      {srv.name.substring(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  {activeServer === srv.id && (
+                    <div className="absolute -left-2 w-1 h-8 bg-fit-primary rounded-r-full" />
+                  )}
               
               {isOwner && srv.id !== 'fitcord-global' && (
                 <button 
@@ -813,6 +827,17 @@ export function ChatInterface({
                 <div className="flex items-center gap-2">
                   {!activePrivateChat && isOwner && (
                     <>
+                      <button 
+                        onClick={() => {
+                          setNewBackgroundUrl(currentChannel?.background_url || '');
+                          setShowBackgroundModal(true);
+                        }}
+                        className="p-2.5 text-fit-primary hover:bg-fit-primary/5 rounded-xl transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                        title="Changer le fond"
+                      >
+                        <ImageIcon size={18} />
+                        <span className="hidden lg:inline">Fond</span>
+                      </button>
                       {currentChannel?.locked ? (
                         <button 
                           onClick={() => onUnlockChannel(activeChannel)}
@@ -852,86 +877,101 @@ export function ChatInterface({
               </div>
 
               {/* Messages Area */}
-              <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 space-y-8 scroll-smooth discord-scrollbar">
-                {displayMessages.length === 0 && (
-                  <div className="h-full flex flex-col items-center justify-center text-fit-muted opacity-30">
-                    <MessageSquare size={64} className="mb-4" />
-                    <p className="font-black uppercase tracking-[0.3em] text-xs">Début de la discussion</p>
-                  </div>
+              <div 
+                ref={scrollRef} 
+                className="flex-1 overflow-y-auto p-8 space-y-8 scroll-smooth discord-scrollbar relative"
+                style={currentChannel?.background_url ? {
+                  backgroundImage: `url(${currentChannel.background_url})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  backgroundAttachment: 'local'
+                } : {}}
+              >
+                {/* Background Overlay to ensure readability */}
+                {currentChannel?.background_url && (
+                  <div className="absolute inset-0 bg-fit-bg/60 pointer-events-none z-0" />
                 )}
-                {displayMessages.map((msg) => {
-                  const isMe = ((msg as any).user || (msg as any).from_user) === username;
-                  return (
-                    <div key={msg.id} className={cn(
-                      "flex gap-4 group relative max-w-[85%]",
-                      isMe ? "ml-auto flex-row-reverse" : ""
-                    )}>
-                      <div 
-                        className="w-10 h-10 bg-fit-surface border border-fit-border rounded-xl flex-shrink-0 flex items-center justify-center text-fit-muted font-black text-xs shadow-sm cursor-pointer overflow-hidden"
-                        onClick={() => {
-                          const user = users.find(u => u.username === ((msg as any).user || (msg as any).from_user));
-                          if (user) setViewingUser(user);
-                        }}
-                      >
-                        {users.find(u => u.username === ((msg as any).user || (msg as any).from_user))?.avatar ? (
-                          <img 
-                            src={users.find(u => u.username === ((msg as any).user || (msg as any).from_user))?.avatar} 
-                            alt="Avatar" 
-                            className="w-full h-full object-cover" 
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          (msg as any).user ? (msg as any).user[0]?.toUpperCase() : (msg as any).from_user[0]?.toUpperCase()
+                <div className="relative z-10 space-y-8">
+                  {displayMessages.length === 0 && (
+                    <div className="h-full flex flex-col items-center justify-center text-fit-muted opacity-30">
+                      <MessageSquare size={64} className="mb-4" />
+                      <p className="font-black uppercase tracking-[0.3em] text-xs">Début de la discussion</p>
+                    </div>
+                  )}
+                  {displayMessages.map((msg) => {
+                    const isMe = ((msg as any).user || (msg as any).from_user) === username;
+                    return (
+                      <div key={msg.id} className={cn(
+                        "flex gap-4 group relative max-w-[85%]",
+                        isMe ? "ml-auto flex-row-reverse" : ""
+                      )}>
+                        <div 
+                          className="w-10 h-10 bg-fit-surface border border-fit-border rounded-xl flex-shrink-0 flex items-center justify-center text-fit-muted font-black text-xs shadow-sm cursor-pointer overflow-hidden"
+                          onClick={() => {
+                            const user = users.find(u => u.username === ((msg as any).user || (msg as any).from_user));
+                            if (user) setViewingUser(user);
+                          }}
+                        >
+                          {users.find(u => u.username === ((msg as any).user || (msg as any).from_user))?.avatar ? (
+                            <img 
+                              src={users.find(u => u.username === ((msg as any).user || (msg as any).from_user))?.avatar} 
+                              alt="Avatar" 
+                              className="w-full h-full object-cover" 
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            (msg as any).user ? (msg as any).user[0]?.toUpperCase() : (msg as any).from_user[0]?.toUpperCase()
+                          )}
+                        </div>
+                        <div className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
+                          <div className="flex items-center gap-2 mb-1 px-1">
+                            <span 
+                              className="font-black text-fit-text text-[11px] cursor-pointer hover:underline"
+                              onClick={() => {
+                                const user = users.find(u => u.username === ((msg as any).user || (msg as any).from_user));
+                                if (user) setViewingUser(user);
+                              }}
+                            >
+                              {users.find(u => u.username === ((msg as any).user || (msg as any).from_user))?.displayName || ((msg as any).user || (msg as any).from_user)}
+                            </span>
+                            <span className="text-[9px] text-fit-muted font-bold">
+                              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <div className={cn(
+                            "px-5 py-3.5 rounded-2xl text-sm leading-relaxed break-words shadow-sm border",
+                            isMe ? "bg-fit-primary text-white border-fit-primary/20 rounded-tr-none" : "bg-fit-surface text-fit-text border-fit-border rounded-tl-none"
+                          )}>
+                            {msg.text}
+                            {msg.file && (
+                              <div className="mt-3 rounded-xl overflow-hidden border border-white/10">
+                                {msg.file.startsWith('data:image') ? (
+                                  <img src={msg.file} alt="Upload" className="max-h-64 w-full object-cover" />
+                                ) : (
+                                  <div className="p-3 bg-white/5 flex items-center gap-3">
+                                    <ImageIcon size={20} />
+                                    <a href={msg.file} download="file" className="text-[10px] font-black uppercase tracking-widest hover:underline">Fichier</a>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {!activePrivateChat && isMod && (
+                          <button 
+                            onClick={() => onDeleteMessage(msg.id)}
+                            className={cn(
+                              "absolute top-0 p-2 text-fit-muted hover:text-fit-accent opacity-0 group-hover:opacity-100 transition-all",
+                              isMe ? "-left-10" : "-right-10"
+                            )}
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         )}
                       </div>
-                      <div className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
-                        <div className="flex items-center gap-2 mb-1 px-1">
-                          <span 
-                            className="font-black text-fit-text text-[11px] cursor-pointer hover:underline"
-                            onClick={() => {
-                              const user = users.find(u => u.username === ((msg as any).user || (msg as any).from_user));
-                              if (user) setViewingUser(user);
-                            }}
-                          >
-                            {users.find(u => u.username === ((msg as any).user || (msg as any).from_user))?.displayName || ((msg as any).user || (msg as any).from_user)}
-                          </span>
-                          <span className="text-[9px] text-fit-muted font-bold">
-                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        <div className={cn(
-                          "px-5 py-3.5 rounded-2xl text-sm leading-relaxed break-words shadow-sm border",
-                          isMe ? "bg-fit-primary text-white border-fit-primary/20 rounded-tr-none" : "bg-fit-surface text-fit-text border-fit-border rounded-tl-none"
-                        )}>
-                          {msg.text}
-                          {msg.file && (
-                            <div className="mt-3 rounded-xl overflow-hidden border border-white/10">
-                              {msg.file.startsWith('data:image') ? (
-                                <img src={msg.file} alt="Upload" className="max-h-64 w-full object-cover" />
-                              ) : (
-                                <div className="p-3 bg-white/5 flex items-center gap-3">
-                                  <ImageIcon size={20} />
-                                  <a href={msg.file} download="file" className="text-[10px] font-black uppercase tracking-widest hover:underline">Fichier</a>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      {!activePrivateChat && isMod && (
-                        <button 
-                          onClick={() => onDeleteMessage(msg.id)}
-                          className={cn(
-                            "absolute top-0 p-2 text-fit-muted hover:text-fit-accent opacity-0 group-hover:opacity-100 transition-all",
-                            isMe ? "-left-10" : "-right-10"
-                          )}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Input Area */}
@@ -1415,6 +1455,70 @@ export function ChatInterface({
                     className="flex-1 py-5 px-4 bg-fit-primary text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-fit-primary-hover hover:-translate-y-1 active:translate-y-0 shadow-xl shadow-fit-primary/20 transition-all disabled:opacity-50 disabled:hover:translate-y-0"
                   >
                     Envoyer
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Background Modal */}
+      <AnimatePresence>
+        {showBackgroundModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowBackgroundModal(false)}
+              className="absolute inset-0 bg-fit-bg/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-md bg-fit-surface border border-fit-border rounded-[3rem] p-8 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-fit-primary/10 rounded-2xl flex items-center justify-center text-fit-primary">
+                    <ImageIcon size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-fit-text tracking-tight">Fond du salon</h2>
+                    <p className="text-xs font-bold text-fit-muted uppercase tracking-widest">#{currentChannel?.name}</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowBackgroundModal(false)} className="p-2 text-fit-muted hover:text-fit-text transition-all">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-[10px] font-black text-fit-muted uppercase tracking-[0.2em] mb-3">URL de l'image (PNG/JPG)</label>
+                  <input 
+                    type="text"
+                    value={newBackgroundUrl}
+                    onChange={(e) => setNewBackgroundUrl(e.target.value)}
+                    className="w-full bg-fit-bg border border-fit-border rounded-2xl px-6 py-4 text-sm font-bold text-fit-text focus:border-fit-primary outline-none transition-all"
+                    placeholder="https://example.com/image.jpg"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    onClick={() => setShowBackgroundModal(false)}
+                    className="flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-fit-muted hover:bg-fit-surface transition-all"
+                  >
+                    Annuler
+                  </button>
+                  <button 
+                    onClick={handleUpdateBackground}
+                    className="flex-1 py-4 bg-fit-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-fit-primary-hover transition-all shadow-lg shadow-fit-primary/20"
+                  >
+                    Appliquer
                   </button>
                 </div>
               </div>

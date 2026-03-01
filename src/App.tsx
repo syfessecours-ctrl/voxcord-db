@@ -42,6 +42,7 @@ export default function App() {
     joinServer,
     lockChannel,
     unlockChannel,
+    updateChannelBackground,
     setRole,
     switchChannel,
     joinVoice,
@@ -98,6 +99,7 @@ export default function App() {
       onJoinServer={joinServer}
       onLockChannel={lockChannel}
       onUnlockChannel={unlockChannel}
+      onUpdateChannelBackground={updateChannelBackground}
       onSetRole={setRole}
       onSendFriendRequest={sendFriendRequest}
       onRespondFriendRequest={respondFriendRequest}

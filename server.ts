@@ -56,6 +56,7 @@ async function initDb() {
       id TEXT PRIMARY KEY,
       name TEXT,
       owner TEXT,
+      icon TEXT,
       timestamp TEXT
     );
 
@@ -72,7 +73,8 @@ async function initDb() {
       type TEXT,
       server_id TEXT,
       locked BOOLEAN DEFAULT false,
-      lock_message TEXT DEFAULT 'Ce salon est verrouillé.'
+      lock_message TEXT DEFAULT 'Ce salon est verrouillé.',
+      background_url TEXT
     );
 
     CREATE TABLE IF NOT EXISTS users (
@@ -157,7 +159,9 @@ async function initDb() {
       { sql: "ALTER TABLE users ADD COLUMN bio TEXT;", code: "42701" },
       { sql: "ALTER TABLE channels ADD COLUMN server_id TEXT;", code: "42701" },
       { sql: "ALTER TABLE channels ADD COLUMN locked BOOLEAN DEFAULT false;", code: "42701" },
-      { sql: "ALTER TABLE channels ADD COLUMN lock_message TEXT DEFAULT 'Ce salon est verrouillé.';", code: "42701" }
+      { sql: "ALTER TABLE channels ADD COLUMN lock_message TEXT DEFAULT 'Ce salon est verrouillé.';", code: "42701" },
+      { sql: "ALTER TABLE channels ADD COLUMN background_url TEXT;", code: "42701" },
+      { sql: "ALTER TABLE servers ADD COLUMN icon TEXT;", code: "42701" }
     ];
 
     for (const migration of migrations) {
@@ -177,6 +181,8 @@ async function initDb() {
       "ALTER TABLE channels ADD COLUMN server_id TEXT;",
       "ALTER TABLE channels ADD COLUMN locked BOOLEAN DEFAULT false;",
       "ALTER TABLE channels ADD COLUMN lock_message TEXT DEFAULT 'Ce salon est verrouillé.';",
+      "ALTER TABLE channels ADD COLUMN background_url TEXT;",
+      "ALTER TABLE servers ADD COLUMN icon TEXT;",
       "ALTER TABLE users ADD COLUMN display_name TEXT;",
       "ALTER TABLE users ADD COLUMN avatar TEXT;",
       "ALTER TABLE users ADD COLUMN bio TEXT;"
@@ -375,9 +381,10 @@ async function startServer() {
 
       const serverId = `srv-${Math.random().toString(36).substr(2, 9)}`;
       const timestamp = new Date().toISOString();
+      const randomIcon = `https://picsum.photos/seed/${serverId}/200/200`;
       
       try {
-        await execute("INSERT INTO servers (id, name, owner, timestamp) VALUES (?, ?, ?, ?)", [serverId, name, user.username, timestamp]);
+        await execute("INSERT INTO servers (id, name, owner, icon, timestamp) VALUES (?, ?, ?, ?, ?)", [serverId, name, user.username, randomIcon, timestamp]);
         await execute("INSERT INTO server_members (server_id, username, timestamp) VALUES (?, ?, ?)", [serverId, user.username, timestamp]);
 
         // Create default channels for the new server
@@ -387,14 +394,21 @@ async function startServer() {
         const voiceChannelId = `vc-${Math.random().toString(36).substr(2, 9)}`;
         await execute("INSERT INTO channels (id, name, type, server_id) VALUES (?, ?, ?, ?)", [voiceChannelId, "Salon Vocal", "voice", serverId]);
 
-        const userServers = await query(`
-          SELECT s.* FROM servers s
-          JOIN server_members sm ON s.id = sm.server_id
-          WHERE sm.username = ?
-        `, [user.username]);
+        // Broadcast to all owners that a new server was created
+        const allServers = await query("SELECT * FROM servers");
+        for (const [sid, u] of users.entries()) {
+          if (u.role === 'owner') {
+            io.to(sid).emit("server_list", allServers);
+          } else if (u.username === user.username) {
+            const userServers = await query(`
+              SELECT s.* FROM servers s
+              JOIN server_members sm ON s.id = sm.server_id
+              WHERE sm.username = ?
+            `, [u.username]);
+            io.to(sid).emit("server_list", userServers);
+          }
+        }
         
-        console.log(`[Server] Sending updated server list to ${user.username}:`, userServers.length, "servers");
-        socket.emit("server_list", userServers);
         socket.emit("server_created", { id: serverId, name });
       } catch (err) {
         console.error("[SERVER_ERROR] Failed to create server:", err);
@@ -737,6 +751,18 @@ async function startServer() {
       }
     });
 
+    socket.on("update_channel_background", async ({ channelId, backgroundUrl }) => {
+      const user = users.get(socket.id);
+      if (!user || user.role !== 'owner') return;
+
+      await execute("UPDATE channels SET background_url = ? WHERE id = ?", [backgroundUrl, channelId]);
+      
+      const channel = await getOne("SELECT * FROM channels WHERE id = ?", [channelId]);
+      if (channel) {
+        io.emit("channel_updated", channel);
+      }
+    });
+
     socket.on("mod_clear_channel", async (channelId) => {
       const admin = users.get(socket.id);
       if (!admin || admin.role !== 'owner') return;
@@ -800,9 +826,22 @@ async function startServer() {
       await execute("DELETE FROM server_members WHERE server_id = ?", [serverId]);
       await execute("DELETE FROM servers WHERE id = ?", [serverId]);
       
-      const userServers = await query("SELECT * FROM servers");
       io.emit("server_deleted", serverId);
-      socket.emit("server_list", userServers);
+      
+      // Broadcast updated list to all owners and affected members
+      const allServers = await query("SELECT * FROM servers");
+      for (const [sid, u] of users.entries()) {
+        if (u.role === 'owner') {
+          io.to(sid).emit("server_list", allServers);
+        } else {
+          const userServers = await query(`
+            SELECT s.* FROM servers s
+            JOIN server_members sm ON s.id = sm.server_id
+            WHERE sm.username = ?
+          `, [u.username]);
+          io.to(sid).emit("server_list", userServers);
+        }
+      }
       
       await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'delete_server', serverId, 'Suppression par owner', new Date().toISOString()]);
     });
