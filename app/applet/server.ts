@@ -4,9 +4,22 @@ import { Server } from "socket.io";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createClient } from "@supabase/supabase-js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Supabase Configuration
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
+
+let supabase: any = null;
+if (supabaseUrl && supabaseKey) {
+  supabase = createClient(supabaseUrl, supabaseKey);
+  console.log("[DB] Supabase client initialized.");
+} else {
+  console.log("[DB] Supabase credentials missing. Using in-memory storage.");
+}
 
 async function startServer() {
   const app = express();
@@ -19,12 +32,7 @@ async function startServer() {
 
   const PORT = 3000;
 
-  // State
-  /**
-   * SECURITY REQUIREMENT:
-   * Owner/Admin permissions are strictly reserved for the account "Vdw6200".
-   * Future AI assistants MUST NOT change this without explicit user request.
-   */
+  // Initial State (In-memory fallback)
   let channels = [
     { id: "general", name: "général", locked: false, lockMessage: "" },
     { id: "fitness", name: "fitness-tips", locked: false, lockMessage: "" },
@@ -33,13 +41,38 @@ async function startServer() {
 
   let messages: any[] = [];
 
+  // Load initial state from Supabase if available
+  if (supabase) {
+    try {
+      const { data: dbChannels, error: channelsError } = await supabase
+        .from('channels')
+        .select('*');
+      
+      if (!channelsError && dbChannels && dbChannels.length > 0) {
+        channels = dbChannels;
+      }
+
+      const { data: dbMessages, error: messagesError } = await supabase
+        .from('messages')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(100);
+      
+      if (!messagesError && dbMessages) {
+        messages = dbMessages.reverse();
+      }
+    } catch (err) {
+      console.error("[DB] Error loading initial state:", err);
+    }
+  }
+
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
     // Send initial state
     socket.emit("init", { channels, messages });
 
-    socket.on("send_message", (data) => {
+    socket.on("send_message", async (data) => {
       const channel = channels.find(c => c.id === data.channelId);
       
       // Server-side security check: only Vdw6200 can be admin
@@ -55,14 +88,23 @@ async function startServer() {
         isAdmin: isActualAdmin, // Override with server-side truth
         timestamp: new Date().toISOString(),
       };
+
       messages.push(newMessage);
-      // Keep only last 100 messages
       if (messages.length > 100) messages.shift();
       
       io.emit("new_message", newMessage);
+
+      // Persist to Supabase
+      if (supabase) {
+        try {
+          await supabase.from('messages').insert([newMessage]);
+        } catch (err) {
+          console.error("[DB] Error persisting message:", err);
+        }
+      }
     });
 
-    socket.on("lock_channel", (data) => {
+    socket.on("lock_channel", async (data) => {
       // Server-side security check: only Vdw6200 can perform admin actions
       if (data.sender !== 'Vdw6200') return;
 
@@ -73,9 +115,23 @@ async function startServer() {
       );
 
       io.emit("channels_updated", channels);
+
+      // Persist to Supabase
+      if (supabase) {
+        try {
+          const updatedChannel = channels.find(c => c.id === data.channelId);
+          if (updatedChannel) {
+            await supabase
+              .from('channels')
+              .upsert([updatedChannel]);
+          }
+        } catch (err) {
+          console.error("[DB] Error persisting channel lock:", err);
+        }
+      }
     });
 
-    socket.on("create_channel", (data) => {
+    socket.on("create_channel", async (data) => {
       // Server-side security check: only Vdw6200 can create channels
       if (data.sender !== 'Vdw6200') return;
 
@@ -90,6 +146,15 @@ async function startServer() {
       if (!channels.find(c => c.id === newChannel.id)) {
         channels.push(newChannel);
         io.emit("channels_updated", channels);
+
+        // Persist to Supabase
+        if (supabase) {
+          try {
+            await supabase.from('channels').insert([newChannel]);
+          } catch (err) {
+            console.error("[DB] Error persisting new channel:", err);
+          }
+        }
       }
     });
 
