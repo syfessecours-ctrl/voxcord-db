@@ -31,6 +31,16 @@ interface Channel {
   locked: boolean;
   lockMessage: string;
   backgroundUrl?: string;
+  iconUrl?: string;
+}
+
+interface UserProfile {
+  pseudo: string;
+  avatarUrl: string;
+  title: string;
+  status: string;
+  isAdmin: boolean;
+  lastSeen: string;
 }
 
 export default function App() {
@@ -45,6 +55,8 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [serverConfig, setServerConfig] = useState({ logoUrl: '' });
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
   
   // Admin Lock State
   const [showAdminPanel, setShowAdminPanel] = useState(false);
@@ -63,10 +75,13 @@ export default function App() {
       const newSocket = io();
       setSocket(newSocket);
 
-      newSocket.on('init', (data: { channels: Channel[], messages: Message[], serverConfig: any }) => {
+      newSocket.emit('user_join', { pseudo });
+
+      newSocket.on('init', (data: { channels: Channel[], messages: Message[], serverConfig: any, users: UserProfile[] }) => {
         setChannels(data.channels);
         setMessages(data.messages);
         if (data.serverConfig) setServerConfig(data.serverConfig);
+        if (data.users) setUsers(data.users);
       });
 
       newSocket.on('new_message', (message: Message) => {
@@ -79,6 +94,10 @@ export default function App() {
 
       newSocket.on('config_updated', (config: any) => {
         setServerConfig(config);
+      });
+
+      newSocket.on('users_updated', (updatedUsers: UserProfile[]) => {
+        setUsers(updatedUsers);
       });
 
       return () => {
@@ -157,6 +176,15 @@ export default function App() {
     });
   };
 
+  const handleUpdateChannelIcon = (channelId: string, url: string) => {
+    if (!socket || !isAdmin) return;
+    socket.emit('update_channel', {
+      channelId: channelId,
+      sender: pseudo,
+      updates: { iconUrl: url }
+    });
+  };
+
   const handleCreateChannel = (e: React.FormEvent) => {
     e.preventDefault();
     if (!socket || !isAdmin || !newChannelName.trim()) return;
@@ -174,6 +202,14 @@ export default function App() {
     socket.emit('update_server_config', {
       sender: pseudo,
       config: { logoUrl: url }
+    });
+  };
+
+  const handleUpdateProfile = (updates: Partial<UserProfile>) => {
+    if (!socket) return;
+    socket.emit('update_user_profile', {
+      pseudo,
+      updates
     });
   };
 
@@ -317,13 +353,19 @@ export default function App() {
               onClick={() => setActiveChannelId(channel.id)}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all ${
                 activeChannelId === channel.id 
-                  ? 'bg-[#7c5dfa] text-white' 
+                  ? 'bg-[#7c5dfa] text-white shadow-[0_0_15px_rgba(124,93,250,0.3)]' 
                   : 'text-[#888891] hover:bg-white/5 hover:text-white'
               }`}
             >
-              <div className="flex items-center space-x-2">
-                <Hash className="w-4 h-4 opacity-50" />
-                <span className="font-medium text-sm">{channel.name}</span>
+              <div className="flex items-center space-x-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden shrink-0 ${activeChannelId === channel.id ? 'bg-white/20' : 'bg-white/5'}`}>
+                  {channel.iconUrl ? (
+                    <img src={channel.iconUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <Hash className="w-4 h-4 opacity-50" />
+                  )}
+                </div>
+                <span className="font-medium text-sm truncate">{channel.name}</span>
               </div>
               {channel.locked && <Lock className="w-3 h-3 opacity-50" />}
             </button>
@@ -333,18 +375,24 @@ export default function App() {
         {/* User Profile */}
         <div className="p-4 bg-[#1e1e24]/50 border-t border-white/5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-full bg-[#7c5dfa]/20 flex items-center justify-center text-[#7c5dfa]">
-                <User className="w-5 h-5" />
+            <button 
+              onClick={() => setShowProfileSettings(true)}
+              className="flex items-center space-x-3 hover:bg-white/5 p-1 rounded-xl transition-all flex-1"
+            >
+              <div className="relative">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[#7c5dfa] overflow-hidden border-2 ${pseudo === 'Vdw6200' ? 'border-[#7c5dfa] shadow-[0_0_10px_rgba(124,93,250,0.5)]' : 'border-white/10'}`}>
+                  <img src={users.find(u => u.pseudo === pseudo)?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${pseudo}`} alt="" className="w-full h-full object-cover" />
+                </div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[#1e1e24]"></div>
               </div>
-              <div>
+              <div className="text-left">
                 <div className="text-sm font-bold flex items-center space-x-1">
-                  <span>{pseudo}</span>
+                  <span className="truncate max-w-[80px]">{pseudo}</span>
                   {isAdmin && <Shield className="w-3 h-3 text-[#7c5dfa]" />}
                 </div>
-                <div className="text-[10px] text-[#888891]">#0001</div>
+                <div className="text-[10px] text-[#888891] truncate max-w-[80px]">{users.find(u => u.pseudo === pseudo)?.title || 'Membre'}</div>
               </div>
-            </div>
+            </button>
             <button 
               onClick={() => setIsLoggedIn(false)}
               className="p-2 text-[#888891] hover:text-red-400 transition-colors"
@@ -467,6 +515,86 @@ export default function App() {
           )}
         </div>
 
+        {/* Profile Settings Overlay */}
+        <AnimatePresence>
+          {showProfileSettings && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="w-full max-w-md bg-[#2b2b36] rounded-[32px] p-8 shadow-2xl border border-white/5"
+              >
+                <div className="flex items-center justify-between mb-8">
+                  <h3 className="text-xl font-bold">Paramètres du Profil</h3>
+                  <button onClick={() => setShowProfileSettings(false)} className="p-2 hover:bg-white/5 rounded-full transition-all">
+                    <Plus className="w-6 h-6 rotate-45" />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="flex flex-col items-center space-y-4">
+                    <div className="relative group">
+                      <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#7c5dfa] shadow-lg">
+                        <img src={users.find(u => u.pseudo === pseudo)?.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      </div>
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-full transition-all cursor-pointer">
+                        <Settings className="w-6 h-6 text-white" />
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <h4 className="font-bold text-lg">{pseudo}</h4>
+                      <p className="text-xs text-[#888891]">{users.find(u => u.pseudo === pseudo)?.title}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-[#888891] ml-1">URL de l'Avatar</label>
+                      <input 
+                        type="text" 
+                        value={users.find(u => u.pseudo === pseudo)?.avatarUrl || ''}
+                        onChange={(e) => handleUpdateProfile({ avatarUrl: e.target.value })}
+                        placeholder="https://..."
+                        className="w-full bg-[#1e1e24] border border-white/5 rounded-xl px-4 py-3 text-sm focus:outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-[#888891] ml-1">Statut</label>
+                      <input 
+                        type="text" 
+                        value={users.find(u => u.pseudo === pseudo)?.status || ''}
+                        onChange={(e) => handleUpdateProfile({ status: e.target.value })}
+                        placeholder="Que faites-vous ?"
+                        className="w-full bg-[#1e1e24] border border-white/5 rounded-xl px-4 py-3 text-sm focus:outline-none"
+                      />
+                    </div>
+                    {isAdmin && (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-[#888891] ml-1">Titre Personnalisé</label>
+                        <input 
+                          type="text" 
+                          value={users.find(u => u.pseudo === pseudo)?.title || ''}
+                          onChange={(e) => handleUpdateProfile({ title: e.target.value })}
+                          placeholder="Ex: Légende & Fondateur"
+                          className="w-full bg-[#1e1e24] border border-white/5 rounded-xl px-4 py-3 text-sm focus:outline-none"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <button 
+                    onClick={() => setShowProfileSettings(false)}
+                    className="w-full bg-[#7c5dfa] hover:bg-[#6d4ee0] text-white font-bold py-4 rounded-2xl transition-all shadow-lg"
+                  >
+                    Enregistrer les modifications
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
         {/* Admin Panel Overlay */}
         <AnimatePresence>
           {showAdminPanel && (
@@ -557,6 +685,17 @@ export default function App() {
                     </div>
 
                     <div className="space-y-1">
+                      <span className="text-[10px] text-[#888891] ml-1">Icône du Salon #{activeChannel?.name}</span>
+                      <input 
+                        type="text" 
+                        value={activeChannel?.iconUrl || ''}
+                        onChange={(e) => handleUpdateChannelIcon(activeChannelId, e.target.value)}
+                        placeholder="URL de l'icône (PNG/JPG)..."
+                        className="w-full bg-[#1e1e24] border border-white/5 rounded-xl px-4 py-3 text-xs focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
                       <span className="text-[10px] text-[#888891] ml-1">Fond du Salon #{activeChannel?.name}</span>
                       <input 
                         type="text" 
@@ -576,6 +715,101 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
+
+      {/* Member List Sidebar */}
+      <div className="w-64 bg-[#2b2b36] border-l border-white/5 flex flex-col shrink-0">
+        <div className="p-6 border-b border-white/5">
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#888891]">Membres — Staff</h3>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          {/* Owners Group */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-[#888891] px-2">
+              <div className="flex items-center space-x-1">
+                <Shield className="w-3 h-3" />
+                <span>Owners</span>
+              </div>
+              <span>{users.filter(u => u.pseudo === 'Vdw6200').length}</span>
+            </div>
+            {users.filter(u => u.pseudo === 'Vdw6200').map(user => (
+              <div key={user.pseudo} className="p-2 rounded-2xl bg-gradient-to-r from-[#7c5dfa]/10 to-transparent border border-[#7c5dfa]/20 shadow-[0_0_15px_rgba(124,93,250,0.1)] group transition-all hover:scale-[1.02]">
+                <div className="flex items-center space-x-3">
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-full border-2 border-[#7c5dfa] p-0.5 shadow-[0_0_10px_rgba(124,93,250,0.4)]">
+                      <img src={user.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" />
+                    </div>
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[#2b2b36]"></div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center space-x-1">
+                      <span className="text-sm font-bold text-[#7c5dfa] truncate">{user.pseudo}</span>
+                      <Shield className="w-3 h-3 text-[#7c5dfa]" />
+                    </div>
+                    <div className="text-[10px] text-[#888891] truncate italic">{user.title}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Admins Group */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-[#888891] px-2">
+              <div className="flex items-center space-x-1">
+                <Shield className="w-3 h-3" />
+                <span>Admins</span>
+              </div>
+              <span>{users.filter(u => u.isAdmin && u.pseudo !== 'Vdw6200').length}</span>
+            </div>
+            {users.filter(u => u.isAdmin && u.pseudo !== 'Vdw6200').map(user => (
+              <div key={user.pseudo} className="p-2 rounded-2xl hover:bg-white/5 group transition-all">
+                <div className="flex items-center space-x-3">
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden">
+                      <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[#2b2b36]"></div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center space-x-1">
+                      <span className="text-sm font-bold truncate">{user.pseudo}</span>
+                      <Shield className="w-3 h-3 text-[#7c5dfa]" />
+                    </div>
+                    <div className="text-[10px] text-[#888891] truncate">{user.title}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Members Group */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-[#888891] px-2">
+              <div className="flex items-center space-x-1">
+                <User className="w-3 h-3" />
+                <span>Membres</span>
+              </div>
+              <span>{users.filter(u => !u.isAdmin).length}</span>
+            </div>
+            {users.filter(u => !u.isAdmin).map(user => (
+              <div key={user.pseudo} className="p-2 rounded-2xl hover:bg-white/5 group transition-all">
+                <div className="flex items-center space-x-3">
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden">
+                      <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[#2b2b36]"></div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium truncate block">{user.pseudo}</span>
+                    <div className="text-[10px] text-[#888891] truncate">{user.status}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

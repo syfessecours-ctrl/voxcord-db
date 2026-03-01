@@ -34,15 +34,24 @@ async function startServer() {
 
   // Initial State (In-memory fallback)
   let channels = [
-    { id: "general", name: "général", locked: false, lockMessage: "", backgroundUrl: "" },
-    { id: "fitness", name: "fitness-tips", locked: false, lockMessage: "", backgroundUrl: "" },
-    { id: "nutrition", name: "nutrition", locked: false, lockMessage: "", backgroundUrl: "" },
+    { id: "general", name: "général", locked: false, lockMessage: "", backgroundUrl: "", iconUrl: "https://picsum.photos/seed/fitcord-gen/200" },
+    { id: "fitness", name: "fitness-tips", locked: false, lockMessage: "", backgroundUrl: "", iconUrl: "https://picsum.photos/seed/fitcord-fit/200" },
+    { id: "nutrition", name: "nutrition", locked: false, lockMessage: "", backgroundUrl: "", iconUrl: "https://picsum.photos/seed/fitcord-nut/200" },
   ];
 
   let messages: any[] = [];
+  let users: Record<string, any> = {}; // Track user profiles by pseudo
   let serverConfig = {
     logoUrl: "" // Empty means use default FC logo
   };
+
+  const SUNNY_IMAGES = [
+    "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=200&h=200&fit=crop",
+    "https://images.unsplash.com/photo-1473116763249-2faaef81ccda?w=200&h=200&fit=crop",
+    "https://images.unsplash.com/photo-1519046904884-53103b34b206?w=200&h=200&fit=crop",
+    "https://images.unsplash.com/photo-1506929199175-60903ee8b5a8?w=200&h=200&fit=crop",
+    "https://images.unsplash.com/photo-1544735030-c567536e7267?w=200&h=200&fit=crop"
+  ];
 
   // Load initial state from Supabase if available
   if (supabase) {
@@ -81,8 +90,31 @@ async function startServer() {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
-    // Send initial state
-    socket.emit("init", { channels, messages, serverConfig });
+    socket.on("user_join", (data) => {
+      const { pseudo } = data;
+      if (!users[pseudo]) {
+        users[pseudo] = {
+          pseudo,
+          avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${pseudo}`,
+          title: pseudo === 'Vdw6200' ? "Légende & Fondateur" : "Membre",
+          status: "En ligne",
+          isAdmin: pseudo === 'Vdw6200',
+          lastSeen: new Date().toISOString()
+        };
+      }
+      socket.data.pseudo = pseudo;
+      io.emit("users_updated", Object.values(users));
+      // Send initial state
+      socket.emit("init", { channels, messages, serverConfig, users: Object.values(users) });
+    });
+
+    socket.on("update_user_profile", (data) => {
+      const { pseudo, updates } = data;
+      if (users[pseudo]) {
+        users[pseudo] = { ...users[pseudo], ...updates };
+        io.emit("users_updated", Object.values(users));
+      }
+    });
 
     socket.on("send_message", async (data) => {
       const channel = channels.find(c => c.id === data.channelId);
@@ -171,12 +203,15 @@ async function startServer() {
       // Server-side security check: only Vdw6200 can create channels
       if (data.sender !== 'Vdw6200') return;
 
+      const randomIcon = SUNNY_IMAGES[Math.floor(Math.random() * SUNNY_IMAGES.length)];
+
       const newChannel = {
         id: data.name.toLowerCase().replace(/\s+/g, '-'),
         name: data.name,
         locked: false,
         lockMessage: "",
-        backgroundUrl: ""
+        backgroundUrl: "",
+        iconUrl: randomIcon
       };
 
       // Avoid duplicates
