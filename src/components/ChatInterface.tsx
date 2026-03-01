@@ -119,19 +119,22 @@ function RemoteVideo({ stream, className }: { stream: MediaStream, className?: s
 // Helper to ensure Dropbox links are direct
 const getDirectUrl = (url: string) => {
   if (!url) return url;
-  if (url.includes('dropbox.com')) {
-    // Force raw=1 for Dropbox links to ensure direct content delivery
-    const cleanUrl = url.split('?')[0];
-    const params = new URLSearchParams(url.split('?')[1] || '');
-    params.set('raw', '1');
-    params.delete('dl');
-    return `${cleanUrl}?${params.toString()}`;
+  try {
+    if (url.includes('dropbox.com')) {
+      const urlObj = new URL(url);
+      urlObj.hostname = 'dl.dropboxusercontent.com';
+      urlObj.searchParams.set('raw', '1');
+      urlObj.searchParams.delete('dl');
+      return urlObj.toString();
+    }
+  } catch (e) {
+    console.error("[Audio] Invalid URL:", url);
   }
   return url;
 };
 
 const KAARIS_BANNER = "https://www.dropbox.com/scl/fi/16fkgzy6fec6f96iubyxb/Kaaris-soutient-Aurier-dans-le-scandale-des-insultes.webp?rlkey=w7qb17whbbd12ttftfim5euwm&st=ju09pv3d&raw=1";
-const KALASH_RINGTONE_URL = "https://www.dropbox.com/scl/fi/mbqd7wa8vwsbvt1uk96fm/Booba-feat-Kaaris-Kalash-Clip-Officiel-1.mp3?rlkey=skq5teslhj6cjhqmh8l22vnrr&st=rs4esv9n&raw=1";
+const KALASH_RINGTONE_URL = "https://www.dropbox.com/scl/fi/mbqd7wa8vwsbvt1uk96fm/Booba-feat-Kaaris-Kalash-Clip-Officiel-1.mp3?rlkey=skq5teslhj6cjhqmh8l22vnrr&st=ap1lmvha&raw=1";
 
 export function ChatInterface({
   username,
@@ -253,18 +256,26 @@ export function ChatInterface({
 
   // Initialize ringtone audio
   useEffect(() => {
-    console.log("[Audio] Initializing ringtone with URL:", KALASH_RINGTONE_URL);
-    const audio = new Audio(getDirectUrl(KALASH_RINGTONE_URL));
+    const currentRingtone = me?.ringtoneUrl || appConfig.default_ringtone || KALASH_RINGTONE_URL;
+    const directUrl = getDirectUrl(currentRingtone);
+    console.log("[Audio] Initializing ringtone with URL:", directUrl);
+    
+    const audio = new Audio(directUrl);
     audio.loop = true;
     audio.volume = 0.8;
     ringtoneAudioRef.current = audio;
+
+    // If it was already playing, start the new audio immediately
+    if (isPlayingRingtone) {
+      audio.play().catch(err => console.error("[Audio] Play failed on re-init:", err));
+    }
 
     return () => {
       console.log("[Audio] Cleaning up ringtone");
       audio.pause();
       audio.src = "";
     };
-  }, []);
+  }, [me?.ringtoneUrl, appConfig.default_ringtone]);
 
   // Handle ringtone playback
   useEffect(() => {
@@ -796,9 +807,19 @@ export function ChatInterface({
       source.connect(audioCtx.destination);
       source.start(0);
       
+      // Also "unlock" the ringtone audio object by playing/pausing it
+      if (ringtoneAudioRef.current) {
+        ringtoneAudioRef.current.play().then(() => {
+          ringtoneAudioRef.current?.pause();
+          ringtoneAudioRef.current!.currentTime = 0;
+        }).catch(() => {
+          // Ignore errors, we're just trying to unlock
+        });
+      }
+      
       window.removeEventListener('click', unlockAudio);
       window.removeEventListener('keydown', unlockAudio);
-      console.log("[Audio] Context unlocked");
+      console.log("[Audio] Context and ringtone object unlocked");
     };
 
     window.addEventListener('click', unlockAudio);
@@ -2497,42 +2518,57 @@ export function ChatInterface({
                     )}
                   </div>
                   
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2">
                     <button 
-                      onClick={() => ringtoneInputRef.current?.click()}
-                      disabled={isRingtoneUploading}
-                      className="flex-1 py-3 bg-fit-primary/10 text-fit-primary rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-fit-primary hover:text-white transition-all disabled:opacity-50"
+                      onClick={() => onUpdateCallSettings(me?.callSoundsEnabled !== false, KALASH_RINGTONE_URL)}
+                      className={cn(
+                        "w-full py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2",
+                        me?.ringtoneUrl === KALASH_RINGTONE_URL 
+                          ? "bg-fit-primary text-white" 
+                          : "bg-fit-primary/10 text-fit-primary hover:bg-fit-primary/20"
+                      )}
                     >
-                      {isRingtoneUploading ? "Envoi..." : me?.ringtoneUrl ? "Changer Sonnerie" : "Choisir MP3"}
+                      <Volume2 size={14} />
+                      Utiliser Sonnerie Kalash (Booba x Kaaris)
                     </button>
-                    <input 
-                      type="file" 
-                      ref={ringtoneInputRef} 
-                      className="hidden" 
-                      accept="audio/mpeg,audio/mp3" 
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        
-                        setIsRingtoneUploading(true);
-                        const formData = new FormData();
-                        formData.append('file', file);
-                        
-                        try {
-                          const res = await fetch('/api/upload', {
-                            method: 'POST',
-                            body: formData
-                          });
-                          const data = await res.json();
-                          onUpdateCallSettings(me?.callSoundsEnabled !== false, data.url);
-                        } catch (err) {
-                          console.error("Error uploading ringtone:", err);
-                          showAlert("Erreur lors de l'envoi de la sonnerie.");
-                        } finally {
-                          setIsRingtoneUploading(false);
-                        }
-                      }} 
-                    />
+                    
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => ringtoneInputRef.current?.click()}
+                        disabled={isRingtoneUploading}
+                        className="flex-1 py-3 bg-white/5 text-fit-text rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all disabled:opacity-50"
+                      >
+                        {isRingtoneUploading ? "Envoi..." : me?.ringtoneUrl ? "Changer Sonnerie" : "Choisir MP3"}
+                      </button>
+                      <input 
+                        type="file" 
+                        ref={ringtoneInputRef} 
+                        className="hidden" 
+                        accept="audio/mpeg,audio/mp3" 
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          
+                          setIsRingtoneUploading(true);
+                          const formData = new FormData();
+                          formData.append('file', file);
+                          
+                          try {
+                            const res = await fetch('/api/upload', {
+                              method: 'POST',
+                              body: formData
+                            });
+                            const data = await res.json();
+                            onUpdateCallSettings(me?.callSoundsEnabled !== false, data.url);
+                          } catch (err) {
+                            console.error("Error uploading ringtone:", err);
+                            showAlert("Erreur lors de l'envoi de la sonnerie.");
+                          } finally {
+                            setIsRingtoneUploading(false);
+                          }
+                        }} 
+                      />
+                    </div>
                   </div>
                 </div>
 
