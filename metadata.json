@@ -1,5 +1,5 @@
 {
-  "name": "Remix: FitCord",
+  "name": "FitCord",
   "description": "Une application de communication en temps réel axée sur le fitness, inspirée de Discord.",
   "requestFramePermissions": [
     "camera",
