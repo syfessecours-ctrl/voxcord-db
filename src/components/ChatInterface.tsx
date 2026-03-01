@@ -253,12 +253,14 @@ export function ChatInterface({
 
   // Initialize ringtone audio
   useEffect(() => {
-    const audio = new Audio(KALASH_RINGTONE_URL);
+    console.log("[Audio] Initializing ringtone with URL:", KALASH_RINGTONE_URL);
+    const audio = new Audio(getDirectUrl(KALASH_RINGTONE_URL));
     audio.loop = true;
-    audio.volume = 0.6;
+    audio.volume = 0.8;
     ringtoneAudioRef.current = audio;
 
     return () => {
+      console.log("[Audio] Cleaning up ringtone");
       audio.pause();
       audio.src = "";
     };
@@ -266,21 +268,27 @@ export function ChatInterface({
 
   // Handle ringtone playback
   useEffect(() => {
-    if (!ringtoneAudioRef.current) return;
+    if (!ringtoneAudioRef.current) {
+      console.warn("[Audio] Ringtone audio object not ready");
+      return;
+    }
 
     if (isPlayingRingtone) {
+      console.log("[Audio] Attempting to play ringtone...");
       const playPromise = ringtoneAudioRef.current.play();
       if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.warn("[Audio] Autoplay prevented, waiting for interaction:", error);
+        playPromise.then(() => {
+          console.log("[Audio] Ringtone playing successfully");
+        }).catch(error => {
+          console.error("[Audio] Play failed (likely autoplay restriction):", error);
         });
       }
     } else {
+      console.log("[Audio] Pausing ringtone");
       ringtoneAudioRef.current.pause();
       ringtoneAudioRef.current.currentTime = 0;
     }
   }, [isPlayingRingtone]);
-  const ringtoneRef = useRef<HTMLAudioElement | null>(null);
   const [showCreateServerModal, setShowCreateServerModal] = useState(false);
   const [newServerName, setNewServerName] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -745,12 +753,6 @@ export function ChatInterface({
         setPrivateCall(prev => ({ ...prev, status: 'active', peerId, isMinimized: true }));
         setIsPlayingRingtone(false);
         
-        // Stop calling sound if we had one (optional)
-        if (ringtoneRef.current) {
-          ringtoneRef.current.pause();
-          ringtoneRef.current = null;
-        }
-
         // Initiate PeerJS call
         if (privatePeerRef.current && privateMyStreamRef.current) {
           const call = privatePeerRef.current.call(peerId, privateMyStreamRef.current);
@@ -820,10 +822,6 @@ export function ChatInterface({
 
   const cleanupPrivateCall = () => {
     setIsPlayingRingtone(false);
-    if (ringtoneRef.current) {
-      ringtoneRef.current.pause();
-      ringtoneRef.current = null;
-    }
     if (privateMyStreamRef.current) {
       privateMyStreamRef.current.getTracks().forEach(track => track.stop());
       privateMyStreamRef.current = null;
@@ -903,10 +901,7 @@ export function ChatInterface({
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       privateMyStreamRef.current = stream;
       
-      if (ringtoneRef.current) {
-        ringtoneRef.current.pause();
-        ringtoneRef.current = null;
-      }
+      setIsPlayingRingtone(false);
 
       const peer = new Peer({
         config: {
@@ -3331,15 +3326,20 @@ export function ChatInterface({
                 <>
                   {/* Call Background with Fade */}
                   <div className="absolute inset-0 z-0 bg-[#1a1b1e] overflow-hidden">
-                    {/* Bottom Image (Kaaris) - Base layer, more visible */}
-                    <img
-                      src={getDirectUrl(KAARIS_BANNER)}
-                      alt="Kaaris"
-                      className="absolute inset-0 w-full h-full object-cover opacity-70"
-                      referrerPolicy="no-referrer"
+                    {/* Bottom Image (Kaaris) - Base layer with mask */}
+                    <div 
+                      className="absolute inset-0 w-full h-full"
+                      style={{
+                        backgroundImage: `url(${getDirectUrl(KAARIS_BANNER)})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        opacity: 0.8,
+                        maskImage: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 90%)',
+                        WebkitMaskImage: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 90%)'
+                      }}
                     />
                     
-                    {/* Top Image (Banner) - Smoother Masked layer */}
+                    {/* Top Image (Banner) - Masked layer */}
                     <AnimatePresence mode="wait">
                       <motion.div
                         key={privateCall.banner || appConfig.default_call_banner}
@@ -3352,14 +3352,14 @@ export function ChatInterface({
                           backgroundImage: `url(${getDirectUrl(privateCall.banner || appConfig.default_call_banner || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000")})`,
                           backgroundSize: 'cover',
                           backgroundPosition: 'center',
-                          maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 70%)',
-                          WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 70%)'
+                          maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 90%)',
+                          WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 90%)'
                         }}
                       />
                     </AnimatePresence>
                     
-                    {/* Dark gradient overlays for text readability and depth */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#1a1b1e] via-transparent to-black/30" />
+                    {/* Dark gradient overlays for text readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#1a1b1e] via-transparent to-black/40" />
                   </div>
 
                   {/* Minimize Button */}
