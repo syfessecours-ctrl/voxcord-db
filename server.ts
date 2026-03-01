@@ -230,7 +230,7 @@ async function initDb() {
   await execute("INSERT INTO channels (id, name, type, server_id) VALUES ('general', 'général', 'text', 'fitcord-global') ON CONFLICT DO NOTHING");
   await execute("INSERT INTO app_config (key, value) VALUES ('logo_url', 'https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
   await execute("INSERT INTO app_config (key, value) VALUES ('default_ringtone', 'https://www.dropbox.com/scl/fi/mbqd7wa8vwsbvt1uk96fm/Booba-feat-Kaaris-Kalash-Clip-Officiel-1.mp3?rlkey=skq5teslhj6cjhqmh8l22vnrr&st=z1awuhbq&raw=1') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
-  await execute("INSERT INTO app_config (key, value) VALUES ('default_call_banner', 'https://www.dropbox.com/scl/fi/16fkgzy6fec6f96iubyxb/Kaaris-soutient-Aurier-dans-le-scandale-des-insultes.webp?rlkey=w7qb17whbbd12ttftfim5euwm&st=ju09pv3d&raw=1') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
+  await execute("INSERT INTO app_config (key, value) VALUES ('default_call_banner', 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
 }
 
 const OWNER_USERNAME = "Vdw6200";

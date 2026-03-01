@@ -3243,10 +3243,13 @@ export function ChatInterface({
                           animate={{ opacity: 0.4 }}
                           exit={{ opacity: 0 }}
                           transition={{ duration: 1 }}
-                          src="https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJ6eW56eW56eW56eW56eW56eW56eW56eW56eW56eW56eW56JmVwPXYxX2ludGVybmFsX2dpZl9ieV9pZCZjdD1n/3o7TKMGpxxH6A5v7m8/giphy.gif"
+                          src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJ6eW56eW56eW56eW56eW56eW56eW56eW56eW56eW56eW56JmVwPXYxX2ludGVybmFsX2dpZl9ieV9pZCZjdD1n/3o7TKMGpxxH6A5v7m8/giphy.gif"
                           alt="Calling"
                           className="w-full h-full object-cover"
                           referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=1000";
+                          }}
                         />
                       ) : (
                         (privateCall.banner || appConfig.default_call_banner) && (
@@ -3260,6 +3263,9 @@ export function ChatInterface({
                             alt="Background"
                             className="w-full h-full object-cover"
                             referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000";
+                            }}
                           />
                         )
                       )}
