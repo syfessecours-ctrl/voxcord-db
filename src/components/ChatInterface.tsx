@@ -916,138 +916,220 @@ export function ChatInterface({
                 </div>
               </div>
 
-              {/* Messages Area */}
-              <div 
-                ref={scrollRef} 
-                className="flex-1 overflow-y-auto p-8 space-y-8 scroll-smooth discord-scrollbar relative"
-                style={currentChannel?.background_url ? {
-                  backgroundImage: `url(${currentChannel.background_url})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  backgroundAttachment: 'local'
-                } : {}}
-              >
-                {/* Background Overlay to ensure readability */}
-                {currentChannel?.background_url && (
-                  <div className="absolute inset-0 bg-fit-bg/60 pointer-events-none z-0" />
-                )}
-                <div className="relative z-10 space-y-8">
-                  {displayMessages.length === 0 && (
-                    <div className="h-full flex flex-col items-center justify-center text-fit-muted opacity-30">
-                      <MessageSquare size={64} className="mb-4" />
-                      <p className="font-black uppercase tracking-[0.3em] text-xs">Début de la discussion</p>
-                    </div>
-                  )}
-                  {displayMessages.map((msg) => {
-                    const isMe = ((msg as any).user || (msg as any).from_user) === username;
-                    return (
-                      <div key={msg.id} className={cn(
-                        "flex gap-4 group relative max-w-[85%]",
-                        isMe ? "ml-auto flex-row-reverse" : ""
-                      )}>
-                        <div 
-                          className="w-10 h-10 bg-fit-surface border border-fit-border rounded-xl flex-shrink-0 flex items-center justify-center text-fit-muted font-black text-xs shadow-sm cursor-pointer overflow-hidden"
-                          onClick={() => {
-                            const user = users.find(u => u.username === ((msg as any).user || (msg as any).from_user));
-                            if (user) setViewingUser(user);
-                          }}
-                        >
-                          {users.find(u => u.username === ((msg as any).user || (msg as any).from_user))?.avatar ? (
-                            <img 
-                              src={users.find(u => u.username === ((msg as any).user || (msg as any).from_user))?.avatar} 
-                              alt="Avatar" 
-                              className="w-full h-full object-cover" 
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            (msg as any).user ? (msg as any).user[0]?.toUpperCase() : (msg as any).from_user[0]?.toUpperCase()
-                          )}
+              {/* Main Content Area */}
+              {currentChannel?.type === 'voice' ? (
+                <div className="flex-1 flex flex-col bg-fit-bg relative overflow-hidden">
+                  {/* Voice Room Header */}
+                  <div className="flex-1 p-8 flex flex-col items-center justify-center">
+                    <div className="w-full max-w-5xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {voiceStates[activeChannel]?.map(vu => {
+                        const user = users.find(u => u.username === vu.username);
+                        return (
+                          <motion.div 
+                            key={vu.sid}
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="aspect-square bg-fit-surface border border-fit-border rounded-[2.5rem] flex flex-col items-center justify-center p-6 relative group hover:border-fit-primary/50 transition-all shadow-xl"
+                          >
+                            {/* Speaking Ring Animation */}
+                            <div className="absolute inset-4 rounded-[2rem] border-2 border-emerald-500/20 animate-ping opacity-20" />
+                            
+                            <div className="relative mb-4">
+                              <div className="p-1 rounded-[2rem] bg-gradient-to-tr from-fit-primary to-emerald-400 shadow-lg">
+                                {user?.avatar ? (
+                                  <img src={user.avatar} alt={vu.username} className="w-24 h-24 rounded-[1.8rem] object-cover bg-fit-bg" referrerPolicy="no-referrer" />
+                                ) : (
+                                  <div className="w-24 h-24 bg-fit-bg rounded-[1.8rem] flex items-center justify-center text-fit-muted font-black text-3xl">
+                                    {vu.username[0].toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full border-4 border-fit-surface flex items-center justify-center">
+                                <Mic size={10} className="text-white" />
+                              </div>
+                            </div>
+                            
+                            <div className="text-center">
+                              <h4 className="font-black text-fit-text tracking-tight">{user?.displayName || vu.username}</h4>
+                              <p className="text-[10px] font-black text-fit-muted uppercase tracking-widest opacity-50">En ligne</p>
+                            </div>
+
+                            {/* Hover Overlay */}
+                            <div className="absolute inset-0 bg-fit-primary/5 opacity-0 group-hover:opacity-100 transition-all rounded-[2.5rem] pointer-events-none" />
+                          </motion.div>
+                        );
+                      })}
+                      {(!voiceStates[activeChannel] || voiceStates[activeChannel].length === 0) && (
+                        <div className="col-span-full flex flex-col items-center justify-center text-fit-muted opacity-20 py-20">
+                          <Volume2 size={80} className="mb-6" />
+                          <p className="font-black uppercase tracking-[0.4em] text-sm">Salon vocal vide</p>
                         </div>
-                        <div className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
-                          <div className="flex items-center gap-2 mb-1 px-1">
-                            <span 
-                              className="font-black text-fit-text text-[11px] cursor-pointer hover:underline"
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Voice Controls Overlay */}
+                  <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-4 px-8 py-4 bg-fit-surface/80 backdrop-blur-xl border border-fit-border rounded-[2.5rem] shadow-2xl z-50">
+                    <button 
+                      onClick={toggleMute}
+                      className={cn(
+                        "w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-lg",
+                        isMuted ? "bg-fit-accent text-white" : "bg-fit-bg text-fit-text hover:bg-fit-primary hover:text-white"
+                      )}
+                    >
+                      {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
+                    </button>
+                    <button 
+                      className="w-14 h-14 rounded-2xl bg-fit-bg text-fit-text flex items-center justify-center hover:bg-fit-primary hover:text-white transition-all shadow-lg"
+                    >
+                      <Settings size={24} />
+                    </button>
+                    <div className="w-[1px] h-8 bg-fit-border mx-2" />
+                    <button 
+                      onClick={onLeaveVoice}
+                      className="px-8 h-14 bg-fit-accent text-white rounded-2xl font-black uppercase tracking-widest flex items-center gap-3 hover:bg-red-600 transition-all shadow-lg shadow-fit-accent/20"
+                    >
+                      <PhoneOff size={20} />
+                      Déconnexion
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Messages Area */}
+                  <div 
+                    ref={scrollRef} 
+                    className="flex-1 overflow-y-auto p-8 space-y-8 scroll-smooth discord-scrollbar relative"
+                    style={currentChannel?.background_url ? {
+                      backgroundImage: `url(${currentChannel.background_url})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      backgroundAttachment: 'local'
+                    } : {}}
+                  >
+                    {/* Background Overlay to ensure readability */}
+                    {currentChannel?.background_url && (
+                      <div className="absolute inset-0 bg-fit-bg/60 pointer-events-none z-0" />
+                    )}
+                    <div className="relative z-10 space-y-8">
+                      {displayMessages.length === 0 && (
+                        <div className="h-full flex flex-col items-center justify-center text-fit-muted opacity-30">
+                          <MessageSquare size={64} className="mb-4" />
+                          <p className="font-black uppercase tracking-[0.3em] text-xs">Début de la discussion</p>
+                        </div>
+                      )}
+                      {displayMessages.map((msg) => {
+                        const isMe = ((msg as any).user || (msg as any).from_user) === username;
+                        return (
+                          <div key={msg.id} className={cn(
+                            "flex gap-4 group relative max-w-[85%]",
+                            isMe ? "ml-auto flex-row-reverse" : ""
+                          )}>
+                            <div 
+                              className="w-10 h-10 bg-fit-surface border border-fit-border rounded-xl flex-shrink-0 flex items-center justify-center text-fit-muted font-black text-xs shadow-sm cursor-pointer overflow-hidden"
                               onClick={() => {
                                 const user = users.find(u => u.username === ((msg as any).user || (msg as any).from_user));
                                 if (user) setViewingUser(user);
                               }}
                             >
-                              {users.find(u => u.username === ((msg as any).user || (msg as any).from_user))?.displayName || ((msg as any).user || (msg as any).from_user)}
-                            </span>
-                            <span className="text-[9px] text-fit-muted font-bold">
-                              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                          <div className={cn(
-                            "px-5 py-3.5 rounded-2xl text-sm leading-relaxed break-words shadow-sm border",
-                            isMe ? "bg-fit-primary text-white border-fit-primary/20 rounded-tr-none" : "bg-fit-surface text-fit-text border-fit-border rounded-tl-none"
-                          )}>
-                            {msg.text}
-                            {msg.file && (
-                              <div className="mt-3 rounded-xl overflow-hidden border border-white/10">
-                                {msg.file.startsWith('data:image') ? (
-                                  <img src={msg.file} alt="Upload" className="max-h-64 w-full object-cover" />
-                                ) : (
-                                  <div className="p-3 bg-white/5 flex items-center gap-3">
-                                    <ImageIcon size={20} />
-                                    <a href={msg.file} download="file" className="text-[10px] font-black uppercase tracking-widest hover:underline">Fichier</a>
+                              {users.find(u => u.username === ((msg as any).user || (msg as any).from_user))?.avatar ? (
+                                <img 
+                                  src={users.find(u => u.username === ((msg as any).user || (msg as any).from_user))?.avatar} 
+                                  alt="Avatar" 
+                                  className="w-full h-full object-cover" 
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                (msg as any).user ? (msg as any).user[0]?.toUpperCase() : (msg as any).from_user[0]?.toUpperCase()
+                              )}
+                            </div>
+                            <div className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
+                              <div className="flex items-center gap-2 mb-1 px-1">
+                                <span 
+                                  className="font-black text-fit-text text-[11px] cursor-pointer hover:underline"
+                                  onClick={() => {
+                                    const user = users.find(u => u.username === ((msg as any).user || (msg as any).from_user));
+                                    if (user) setViewingUser(user);
+                                  }}
+                                >
+                                  {users.find(u => u.username === ((msg as any).user || (msg as any).from_user))?.displayName || ((msg as any).user || (msg as any).from_user)}
+                                </span>
+                                <span className="text-[9px] text-fit-muted font-bold">
+                                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                              <div className={cn(
+                                "px-5 py-3.5 rounded-2xl text-sm leading-relaxed break-words shadow-sm border",
+                                isMe ? "bg-fit-primary text-white border-fit-primary/20 rounded-tr-none" : "bg-fit-surface text-fit-text border-fit-border rounded-tl-none"
+                              )}>
+                                {msg.text}
+                                {msg.file && (
+                                  <div className="mt-3 rounded-xl overflow-hidden border border-white/10">
+                                    {msg.file.startsWith('data:image') ? (
+                                      <img src={msg.file} alt="Upload" className="max-h-64 w-full object-cover" />
+                                    ) : (
+                                      <div className="p-3 bg-white/5 flex items-center gap-3">
+                                        <ImageIcon size={20} />
+                                        <a href={msg.file} download="file" className="text-[10px] font-black uppercase tracking-widest hover:underline">Fichier</a>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
+                            </div>
+                            {!activePrivateChat && isMod && (
+                              <button 
+                                onClick={() => onDeleteMessage(msg.id)}
+                                className={cn(
+                                  "absolute top-0 p-2 text-fit-muted hover:text-fit-accent opacity-0 group-hover:opacity-100 transition-all",
+                                  isMe ? "-left-10" : "-right-10"
+                                )}
+                              >
+                                <Trash2 size={16} />
+                              </button>
                             )}
                           </div>
-                        </div>
-                        {!activePrivateChat && isMod && (
-                          <button 
-                            onClick={() => onDeleteMessage(msg.id)}
-                            className={cn(
-                              "absolute top-0 p-2 text-fit-muted hover:text-fit-accent opacity-0 group-hover:opacity-100 transition-all",
-                              isMe ? "-left-10" : "-right-10"
-                            )}
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Input Area */}
-              <div className="p-8 pt-0">
-                <div className="bg-fit-surface rounded-[2rem] border border-fit-border p-2 shadow-xl shadow-fit-primary/5 focus-within:border-fit-primary/50 transition-all">
-                  <form 
-                    onSubmit={handleSendMessage}
-                    className="flex items-center gap-2"
-                  >
-                    <label className="w-12 h-12 flex items-center justify-center text-fit-muted hover:text-fit-primary hover:bg-fit-primary/5 rounded-full transition-all cursor-pointer">
-                      <Plus size={24} />
-                      <input type="file" className="hidden" onChange={handleFileUpload} />
-                    </label>
-                    <input 
-                      type="text"
-                      value={inputText}
-                      onChange={(e) => setInputText(e.target.value)}
-                      disabled={currentChannel?.locked && !isOwner && me?.role !== 'moderator'}
-                      placeholder={
-                        currentChannel?.locked && !isOwner && me?.role !== 'moderator' 
-                          ? (currentChannel.lock_message || "Ce salon est verrouillé.") 
-                          : (activePrivateChat ? `Message à @${activePrivateChat}` : `Message dans #${currentChannel?.name}`)
-                      }
-                      className="flex-1 bg-transparent border-none outline-none text-fit-text py-3 px-2 text-sm font-bold placeholder:text-fit-muted/50 disabled:opacity-50"
-                    />
-                    <div className="flex items-center gap-1">
-                      <button type="button" className="w-12 h-12 flex items-center justify-center text-fit-muted hover:text-fit-primary hover:bg-fit-primary/5 rounded-full transition-all">
-                        <Smile size={24} />
-                      </button>
-                      <button type="submit" disabled={!inputText.trim()} className="w-12 h-12 flex items-center justify-center bg-fit-primary text-white rounded-full hover:bg-fit-primary-hover hover:scale-105 active:scale-95 transition-all shadow-lg shadow-fit-primary/20 disabled:opacity-50 disabled:hover:scale-100">
-                        <Send size={20} />
-                      </button>
+                        );
+                      })}
                     </div>
-                  </form>
-                </div>
-              </div>
+                  </div>
+
+                  {/* Input Area */}
+                  <div className="p-8 pt-0">
+                    <div className="bg-fit-surface rounded-[2rem] border border-fit-border p-2 shadow-xl shadow-fit-primary/5 focus-within:border-fit-primary/50 transition-all">
+                      <form 
+                        onSubmit={handleSendMessage}
+                        className="flex items-center gap-2"
+                      >
+                        <label className="w-12 h-12 flex items-center justify-center text-fit-muted hover:text-fit-primary hover:bg-fit-primary/5 rounded-full transition-all cursor-pointer">
+                          <Plus size={24} />
+                          <input type="file" className="hidden" onChange={handleFileUpload} />
+                        </label>
+                        <input 
+                          type="text"
+                          value={inputText}
+                          onChange={(e) => setInputText(e.target.value)}
+                          disabled={currentChannel?.locked && !isOwner && me?.role !== 'moderator'}
+                          placeholder={
+                            currentChannel?.locked && !isOwner && me?.role !== 'moderator' 
+                              ? (currentChannel.lock_message || "Ce salon est verrouillé.") 
+                              : (activePrivateChat ? `Message à @${activePrivateChat}` : `Message dans #${currentChannel?.name}`)
+                          }
+                          className="flex-1 bg-transparent border-none outline-none text-fit-text py-3 px-2 text-sm font-bold placeholder:text-fit-muted/50 disabled:opacity-50"
+                        />
+                        <div className="flex items-center gap-1">
+                          <button type="button" className="w-12 h-12 flex items-center justify-center text-fit-muted hover:text-fit-primary hover:bg-fit-primary/5 rounded-full transition-all">
+                            <Smile size={24} />
+                          </button>
+                          <button type="submit" disabled={!inputText.trim()} className="w-12 h-12 flex items-center justify-center bg-fit-primary text-white rounded-full hover:bg-fit-primary-hover hover:scale-105 active:scale-95 transition-all shadow-lg shadow-fit-primary/20 disabled:opacity-50 disabled:hover:scale-100">
+                            <Send size={20} />
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
