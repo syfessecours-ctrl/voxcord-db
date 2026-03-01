@@ -75,6 +75,24 @@ async function startServer() {
       io.emit("channels_updated", channels);
     });
 
+    socket.on("create_channel", (data) => {
+      // Server-side security check: only Vdw6200 can create channels
+      if (data.sender !== 'Vdw6200') return;
+
+      const newChannel = {
+        id: data.name.toLowerCase().replace(/\s+/g, '-'),
+        name: data.name,
+        locked: false,
+        lockMessage: ""
+      };
+
+      // Avoid duplicates
+      if (!channels.find(c => c.id === newChannel.id)) {
+        channels.push(newChannel);
+        io.emit("channels_updated", channels);
+      }
+    });
+
     socket.on("disconnect", () => {
       console.log("User disconnected:", socket.id);
     });

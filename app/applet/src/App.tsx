@@ -48,6 +48,10 @@ export default function App() {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [lockChannelId, setLockChannelId] = useState('general');
   const [lockMessage, setLockMessage] = useState('');
+
+  // Create Channel State
+  const [showCreateChannel, setShowCreateChannel] = useState(false);
+  const [newChannelName, setNewChannelName] = useState('');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -137,6 +141,18 @@ export default function App() {
     });
   };
 
+  const handleCreateChannel = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!socket || !isAdmin || !newChannelName.trim()) return;
+
+    socket.emit('create_channel', {
+      name: newChannelName.trim(),
+      sender: pseudo
+    });
+    setNewChannelName('');
+    setShowCreateChannel(false);
+  };
+
   const activeChannel = channels.find(c => c.id === activeChannelId);
   const filteredMessages = messages.filter(m => m.channelId === activeChannelId);
 
@@ -209,9 +225,58 @@ export default function App() {
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-          <div className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-[#888891]">
-            Salons Textuels
+          <div className="px-3 mb-2 flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#888891]">
+              Salons Textuels
+            </span>
+            {isAdmin && (
+              <button 
+                onClick={() => setShowCreateChannel(true)}
+                className="p-1 text-[#888891] hover:text-white transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            )}
           </div>
+          
+          {/* Create Channel Inline Input */}
+          <AnimatePresence>
+            {showCreateChannel && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="px-3 mb-4"
+              >
+                <form onSubmit={handleCreateChannel} className="space-y-2">
+                  <input 
+                    autoFocus
+                    type="text" 
+                    value={newChannelName}
+                    onChange={(e) => setNewChannelName(e.target.value)}
+                    placeholder="Nom du salon"
+                    className="w-full bg-[#1e1e24] border border-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#7c5dfa]"
+                  />
+                  <div className="flex space-x-2">
+                    <button 
+                      type="submit"
+                      className="flex-1 bg-[#7c5dfa] text-white text-[10px] font-bold py-1.5 rounded-lg"
+                    >
+                      Créer
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setShowCreateChannel(false)}
+                      className="flex-1 bg-white/5 text-[#888891] text-[10px] font-bold py-1.5 rounded-lg"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {channels.map(channel => (
             <button
               key={channel.id}
