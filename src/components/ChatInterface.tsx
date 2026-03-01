@@ -3265,35 +3265,40 @@ export function ChatInterface({
               ) : (
                 <>
                   {/* Call Background with Fade */}
-                  <div className="absolute inset-0 z-0 bg-fit-bg overflow-hidden">
-                    {/* Image Kaaris en fond permanent (légèrement assombrie) */}
-                    <img
-                      src={getDirectUrl(KAARIS_BANNER)}
-                      alt="Kaaris Background"
-                      className="absolute inset-0 w-full h-full object-cover opacity-40"
-                      referrerPolicy="no-referrer"
-                    />
-                    
-                    <AnimatePresence mode="wait">
-                      {/* Bannière de l'appelant en fondu par-dessus */}
-                      {(privateCall.banner || appConfig.default_call_banner) && (
+                  <div className="absolute inset-0 z-0 bg-[#1a1b1e] overflow-hidden">
+                    {/* Top Banner with Blur/Fade */}
+                    <div className="absolute top-0 left-0 w-full h-[65%] overflow-hidden">
+                      <AnimatePresence mode="wait">
                         <motion.img
                           key={privateCall.banner || appConfig.default_call_banner}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 0.6 }}
                           exit={{ opacity: 0 }}
-                          transition={{ duration: 1.5 }}
-                          src={getDirectUrl(privateCall.banner || appConfig.default_call_banner)}
-                          alt="Caller Banner"
-                          className="absolute inset-0 w-full h-full object-cover"
+                          transition={{ duration: 1.2 }}
+                          src={getDirectUrl(privateCall.banner || appConfig.default_call_banner || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000")}
+                          alt="Banner"
+                          className="w-full h-full object-cover scale-110 blur-[2px]"
                           referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
                         />
-                      )}
-                    </AnimatePresence>
-                    <div className="absolute inset-0 bg-gradient-to-b from-fit-surface/20 via-fit-surface/40 to-fit-surface" />
+                      </AnimatePresence>
+                      {/* Dark overlay to match the image's mood */}
+                      <div className="absolute inset-0 bg-black/40" />
+                      {/* Gradient to fade the banner into the dark background */}
+                      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#1a1b1e]/60 to-[#1a1b1e]" />
+                    </div>
+
+                    {/* Bottom part: Kaaris Image as background replacement for gray */}
+                    <div className="absolute bottom-0 left-0 w-full h-[50%] overflow-hidden">
+                      <motion.img
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 0.15 }}
+                        src={getDirectUrl(KAARIS_BANNER)}
+                        alt="Kaaris"
+                        className="w-full h-full object-cover grayscale brightness-50"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#1a1b1e] via-[#1a1b1e]/40 to-transparent" />
+                    </div>
                   </div>
 
                   {/* Minimize Button */}
@@ -3302,75 +3307,90 @@ export function ChatInterface({
                       e.stopPropagation();
                       setPrivateCall(prev => ({ ...prev, isMinimized: true }));
                     }}
-                    className="absolute top-6 right-6 z-20 w-10 h-10 bg-fit-surface/50 hover:bg-fit-surface text-fit-text rounded-full flex items-center justify-center backdrop-blur-md transition-all active:scale-90"
+                    className="absolute top-6 right-6 z-30 w-10 h-10 bg-white/5 hover:bg-white/10 text-white/70 rounded-full flex items-center justify-center backdrop-blur-xl transition-all active:scale-90 border border-white/10"
                   >
-                    <Minimize2 size={18} />
+                    <Minimize2 size={16} />
                   </button>
 
-                  <div className="px-8 pb-10 pt-16 relative z-10 flex flex-col items-center text-center">
-                    {/* Avatar */}
-                    <div className="relative mb-6">
-                      <div className="w-28 h-28 rounded-[2.5rem] bg-fit-bg border-4 border-fit-surface shadow-2xl overflow-hidden flex items-center justify-center text-fit-muted font-black text-4xl">
+                  <div className="px-8 pb-12 pt-20 relative z-10 flex flex-col items-center text-center w-full h-full justify-center">
+                    {/* Avatar - Rounded Square like in the image */}
+                    <div className="relative mb-10">
+                      <motion.div 
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="w-36 h-36 rounded-[2.5rem] bg-[#2a2d31] border-[8px] border-[#1a1b1e] shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex items-center justify-center"
+                      >
                         {privateCall.avatar ? (
                           <img src={getDirectUrl(privateCall.avatar)} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
-                          privateCall.otherUser[0]?.toUpperCase()
+                          <span className="text-white font-black text-5xl">{privateCall.otherUser[0]?.toUpperCase()}</span>
                         )}
-                      </div>
+                      </motion.div>
                       {privateCall.status === 'active' && (
-                        <div className="absolute -bottom-1 -right-1 bg-emerald-500 w-8 h-8 rounded-full border-4 border-fit-surface flex items-center justify-center">
-                          <div className="w-2 h-2 bg-white rounded-full animate-ping" />
+                        <div className="absolute -bottom-1 -right-1 bg-emerald-500 w-10 h-10 rounded-full border-[6px] border-[#1a1b1e] flex items-center justify-center">
+                          <div className="w-2.5 h-2.5 bg-white rounded-full animate-ping" />
                         </div>
                       )}
                     </div>
 
-                    <h2 className="text-3xl font-black text-fit-text tracking-tighter mb-1">
-                      {privateCall.displayName || privateCall.otherUser}
-                    </h2>
-                    
-                    <div className="mb-10">
+                    <div className="flex flex-col items-center gap-2 mb-14">
+                      <h2 className="text-4xl font-black text-white tracking-tight drop-shadow-lg uppercase">
+                        {privateCall.displayName || privateCall.otherUser}
+                      </h2>
+                      
                       {privateCall.status === 'calling' && (
-                        <div className="flex flex-col items-center gap-1">
-                          <span className="text-fit-primary font-black text-[10px] uppercase tracking-[0.4em] animate-pulse">Appel en cours...</span>
-                        </div>
+                        <span className="text-fit-primary font-black text-[11px] uppercase tracking-[0.3em] opacity-90 drop-shadow-md">Appel en cours...</span>
                       )}
                       {privateCall.status === 'incoming' && (
-                        <div className="flex flex-col items-center gap-1">
-                          <span className="text-fit-accent font-black text-[10px] uppercase tracking-[0.4em] animate-bounce">Appel entrant</span>
-                        </div>
+                        <span className="text-[#ff4b5c] font-black text-[11px] uppercase tracking-[0.3em] drop-shadow-md">Appel entrant</span>
                       )}
                       {privateCall.status === 'active' && (
-                        <div className="flex flex-col items-center gap-1">
-                          <span className="text-emerald-500 font-black text-[10px] uppercase tracking-[0.4em]">En communication</span>
-                        </div>
+                        <span className="text-emerald-500 font-black text-[11px] uppercase tracking-[0.3em] drop-shadow-md">En communication</span>
                       )}
                     </div>
 
                     {/* Call Actions */}
-                    <div className="flex items-center gap-6">
-                      {privateCall.status === 'incoming' ? (
-                        <>
-                          <button 
-                            onClick={rejectCall}
-                            className="w-16 h-16 bg-fit-accent text-white rounded-full flex items-center justify-center shadow-xl shadow-fit-accent/40 hover:scale-110 active:scale-95 transition-all"
-                          >
-                            <PhoneOff size={28} />
-                          </button>
-                          <button 
-                            onClick={acceptCall}
-                            className="w-20 h-20 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-xl shadow-emerald-500/40 hover:scale-110 active:scale-95 transition-all"
-                          >
-                            <Video size={32} />
-                          </button>
-                        </>
-                      ) : (
+                    <div className="flex flex-col items-center gap-6">
+                      {/* Sound Activation Button (if blocked by browser) */}
+                      {isPlayingRingtone && (
                         <button 
-                          onClick={endCall}
-                          className="w-20 h-20 bg-fit-accent text-white rounded-full flex items-center justify-center shadow-xl shadow-fit-accent/40 hover:scale-110 active:scale-95 transition-all"
+                          onClick={() => {
+                            // Interaction to unlock audio
+                            setIsPlayingRingtone(false);
+                            setTimeout(() => setIsPlayingRingtone(true), 100);
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white/70 rounded-full text-[10px] uppercase tracking-widest backdrop-blur-md border border-white/10 transition-all active:scale-95 mb-2"
                         >
-                          <PhoneOff size={32} />
+                          <Volume2 size={12} />
+                          <span>Activer le son si muet</span>
                         </button>
                       )}
+
+                      <div className="flex items-center gap-10">
+                        {privateCall.status === 'incoming' ? (
+                          <>
+                            <button 
+                              onClick={rejectCall}
+                              className="w-20 h-20 bg-[#ff4b5c] text-white rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(255,75,92,0.3)] hover:scale-110 active:scale-95 transition-all group"
+                            >
+                              <PhoneOff size={32} className="group-hover:rotate-12 transition-transform" />
+                            </button>
+                            <button 
+                              onClick={acceptCall}
+                              className="w-20 h-20 bg-[#00c896] text-white rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(0,200,150,0.3)] hover:scale-110 active:scale-95 transition-all group"
+                            >
+                              <Video size={32} className="group-hover:scale-110 transition-transform" />
+                            </button>
+                          </>
+                        ) : (
+                          <button 
+                            onClick={endCall}
+                            className="w-20 h-20 bg-[#ff4b5c] text-white rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(255,75,92,0.3)] hover:scale-110 active:scale-95 transition-all group"
+                          >
+                            <PhoneOff size={32} className="group-hover:rotate-12 transition-transform" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </>
@@ -3384,18 +3404,29 @@ export function ChatInterface({
               )}
 
               {/* Hidden YouTube Player for Ringtone */}
-              <div className="hidden pointer-events-none opacity-0">
+              <div className="absolute top-0 left-0 w-1 h-1 pointer-events-none opacity-[0.01] overflow-hidden">
                 <ReactPlayer
                   {...({
                     url: KALASH_YOUTUBE,
                     playing: isPlayingRingtone,
                     loop: true,
-                    volume: 0.4,
-                    width: 0,
-                    height: 0,
+                    volume: 0.6,
+                    width: '100%',
+                    height: '100%',
+                    playsinline: true,
+                    onStart: () => console.log("YouTube Ringtone Started"),
+                    onPlay: () => console.log("YouTube Ringtone Playing"),
+                    onError: (e: any) => console.error("YouTube Ringtone Error:", e),
                     config: {
                       youtube: {
-                        playerVars: { controls: 0, disablekb: 1 }
+                        playerVars: { 
+                          autoplay: 1,
+                          controls: 0, 
+                          disablekb: 1,
+                          modestbranding: 1,
+                          rel: 0,
+                          origin: window.location.origin
+                        }
                       }
                     }
                   } as any)}
