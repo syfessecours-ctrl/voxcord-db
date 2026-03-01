@@ -279,17 +279,21 @@ async function startServer() {
         const isValid = await bcrypt.compare(password, userRecord.password_hash);
         if (!isValid) return socket.emit("login_error", "Mot de passe incorrect.");
         
-        // Ensure owner role is updated if username matches OWNER_USERNAME
-        if (username.toLowerCase() === OWNER_USERNAME.toLowerCase() && userRecord.role !== 'owner') {
-          await execute("UPDATE users SET role = 'owner' WHERE username = ?", [username]);
+        // Ensure owner role is updated if username matches OWNER_USERNAME exactly
+        if (username === OWNER_USERNAME && userRecord.role !== 'owner') {
+          await execute("UPDATE users SET role = 'owner', can_send_large_videos = true WHERE username = ?", [username]);
           userRecord.role = 'owner';
+          userRecord.can_send_large_videos = true;
         }
       } else {
         const salt = await bcrypt.genSalt(10);
         const hash = await bcrypt.hash(password, salt);
-        const role = username.toLowerCase() === OWNER_USERNAME.toLowerCase() ? 'owner' : 'user';
-        await execute("INSERT INTO users (username, password_hash, role, last_ip) VALUES (?, ?, ?, ?)", [username, hash, role, clientIp]);
-        userRecord = { username, role };
+        const role = username === OWNER_USERNAME ? 'owner' : 'user';
+        const canSendLarge = role === 'owner';
+        
+        await execute("INSERT INTO users (username, password_hash, role, last_ip, can_send_large_videos) VALUES (?, ?, ?, ?, ?)", 
+          [username, hash, role, clientIp, canSendLarge]);
+        userRecord = { username, role, can_send_large_videos: canSendLarge };
       }
 
       users.set(socket.id, { 

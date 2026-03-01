@@ -206,10 +206,11 @@ export function ChatInterface({
     const file = e.target.files?.[0];
     if (file) {
       const isVideo = file.type.startsWith('video/');
-      const maxSize = me?.canSendLargeVideos ? 500 * 1024 * 1024 : 50 * 1024 * 1024; // 500MB vs 50MB
+      const hasLargeVideoPermission = me?.canSendLargeVideos || isOwner;
+      const maxSize = hasLargeVideoPermission ? 500 * 1024 * 1024 : 50 * 1024 * 1024; // 500MB vs 50MB
       
       if (file.size > maxSize) {
-        alert(`Fichier trop volumineux ! Limite : ${me?.canSendLargeVideos ? '500 Mo' : '50 Mo'}.`);
+        alert(`Fichier trop volumineux ! Limite : ${hasLargeVideoPermission ? '500 Mo' : '50 Mo'}.`);
         return;
       }
 
@@ -1138,11 +1139,11 @@ export function ChatInterface({
                       >
                         <label 
                           className="w-12 h-12 flex items-center justify-center text-fit-muted hover:text-fit-primary hover:bg-fit-primary/5 rounded-full transition-all cursor-pointer relative group"
-                          title={`Limite d'envoi : ${me?.canSendLargeVideos ? '500 Mo' : '50 Mo'}`}
+                          title={`Limite d'envoi : ${me?.canSendLargeVideos || isOwner ? '500 Mo' : '50 Mo'}`}
                         >
                           <Plus size={24} />
                           <input type="file" className="hidden" onChange={handleFileUpload} />
-                          {me?.canSendLargeVideos && (
+                          {(me?.canSendLargeVideos || isOwner) && (
                             <div className="absolute -top-1 -right-1 bg-emerald-500 text-white p-0.5 rounded-full shadow-lg">
                               <Video size={8} />
                             </div>
