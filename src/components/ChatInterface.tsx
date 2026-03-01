@@ -72,13 +72,37 @@ interface ChatInterfaceProps {
   onSendFriendRequest: (targetUsername: string) => void;
   onRespondFriendRequest: (requestId: number, response: 'accepted' | 'rejected') => void;
   onUpdateStatus: (status: 'online' | 'away') => void;
-  onUpdateProfile: (profile: { displayName?: string, avatar?: string, bio?: string }) => void;
+  onUpdateProfile: (profile: { displayName?: string, avatar?: string, banner?: string, bio?: string }) => void;
   onUpdateAppLogo: (logoUrl: string) => void;
+  onUpdateServer: (serverId: string, name: string, icon: string, banner: string) => void;
+  onResetServerIcon: (serverId: string) => void;
+  onResetServerBanner: (serverId: string) => void;
   onToggleLargeVideo: (targetUsername: string) => void;
+  onToggleGifs: (targetUsername: string) => void;
   onSwitchPrivateChat: (otherUser: string | null) => void;
   onCreateServer: (name: string) => void;
   onInviteToServer: (serverId: string, targetUsername: string) => void;
   onSwitchServer: (id: string | null) => void;
+}
+
+// Helper component for remote video to handle srcObject correctly
+function RemoteVideo({ stream, className }: { stream: MediaStream, className?: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  return (
+    <video 
+      ref={videoRef} 
+      autoPlay 
+      playsInline 
+      className={cn("w-full h-full object-cover", className)}
+    />
+  );
 }
 
 export function ChatInterface({
@@ -121,7 +145,11 @@ export function ChatInterface({
   onUpdateStatus,
   onUpdateProfile,
   onUpdateAppLogo,
+  onUpdateServer,
+  onResetServerIcon,
+  onResetServerBanner,
   onToggleLargeVideo,
+  onToggleGifs,
   onSwitchPrivateChat,
   onCreateServer,
   onInviteToServer,
@@ -149,6 +177,12 @@ export function ChatInterface({
   const [lockMessage, setLockMessage] = useState('Seul les modérateurs peuvent écrire ici');
   const [inviteTarget, setInviteTarget] = useState('');
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showServerSettingsModal, setShowServerSettingsModal] = useState(false);
+  const [serverSettingsForm, setServerSettingsForm] = useState({
+    name: '',
+    icon: '',
+    banner: ''
+  });
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
@@ -157,6 +191,7 @@ export function ChatInterface({
   const [profileForm, setProfileForm] = useState({
     displayName: me?.displayName || '',
     avatar: me?.avatar || '',
+    banner: me?.banner || '',
     bio: me?.bio || ''
   });
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -170,22 +205,117 @@ export function ChatInterface({
   const [remoteStreams, setRemoteStreams] = useState<number>(0); // Trigger re-render
   const [myPeerId, setMyPeerId] = useState<string | null>(null);
   const signaledUsersRef = useRef<Set<string>>(new Set());
+  const prevVoiceUsersCountRef = useRef<number>(0);
+  const prevActiveVoiceChannelRef = useRef<string | null>(null);
 
   const voiceUsersRef = useRef(voiceUsers);
+
+  // Sound effects
+  const playSound = (type: 'join' | 'leave') => {
+    const sounds = {
+      join: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
+      leave: 'https://assets.mixkit.co/active_storage/sfx/2570/2570-preview.mp3'
+    };
+    const audio = new Audio(sounds[type]);
+    audio.volume = 0.2; // Low volume to be non-intrusive
+    audio.play().catch(e => console.log("Audio play blocked by browser", e));
+  };
 
   useEffect(() => {
     voiceUsersRef.current = voiceUsers;
   }, [voiceUsers]);
+
+  // Handle own join/leave sounds and other users join/leave sounds
+  useEffect(() => {
+    const currentChannelUsers = activeVoiceChannel ? (voiceStates[activeVoiceChannel] || []) : [];
+    const currentCount = currentChannelUsers.length;
+
+    // 1. Handle own join/leave
+    if (activeVoiceChannel !== prevActiveVoiceChannelRef.current) {
+      if (activeVoiceChannel) {
+        playSound('join');
+      } else if (prevActiveVoiceChannelRef.current) {
+        playSound('leave');
+      }
+      prevActiveVoiceChannelRef.current = activeVoiceChannel;
+      prevVoiceUsersCountRef.current = currentCount;
+      return;
+    }
+
+    // 2. Handle others join/leave in the same channel
+    if (activeVoiceChannel && currentCount !== prevVoiceUsersCountRef.current) {
+      if (currentCount > prevVoiceUsersCountRef.current) {
+        // Someone joined (and it's not me because I already handled it above)
+        playSound('join');
+      } else if (currentCount < prevVoiceUsersCountRef.current) {
+        // Someone left
+        playSound('leave');
+      }
+      prevVoiceUsersCountRef.current = currentCount;
+    }
+  }, [activeVoiceChannel, voiceStates]);
+
+  useEffect(() => {
+    if (activeServer) {
+      const server = servers.find(s => s.id === activeServer);
+      if (server) {
+        setServerSettingsForm({
+          name: server.name || '',
+          icon: server.icon || '',
+          banner: server.banner || ''
+        });
+      }
+    }
+  }, [activeServer, servers]);
 
   useEffect(() => {
     if (me) {
       setProfileForm({
         displayName: me.displayName || '',
         avatar: me.avatar || '',
+        banner: me.banner || '',
         bio: me.bio || ''
       });
     }
   }, [me]);
+
+  const handleUpdateServer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (activeServer) {
+      onUpdateServer(activeServer, serverSettingsForm.name, serverSettingsForm.icon, serverSettingsForm.banner);
+      setShowServerSettingsModal(false);
+    }
+  };
+
+  const handleServerIconFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type === 'image/gif' && !me?.canUseGifs) {
+        alert("Vous n'avez pas l'autorisation d'utiliser des GIFs animés. Demandez au propriétaire !");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setServerSettingsForm(prev => ({ ...prev, icon: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleServerBannerFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type === 'image/gif' && !me?.canUseGifs) {
+        alert("Vous n'avez pas l'autorisation d'utiliser des GIFs animés. Demandez au propriétaire !");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setServerSettingsForm(prev => ({ ...prev, banner: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleUpdateProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -360,9 +490,28 @@ export function ChatInterface({
   const handleAvatarFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.type === 'image/gif' && !me?.canUseGifs) {
+        alert("Vous n'avez pas l'autorisation d'utiliser des GIFs animés. Demandez au propriétaire !");
+        return;
+      }
       const reader = new FileReader();
       reader.onload = () => {
         setProfileForm(prev => ({ ...prev, avatar: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleBannerFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type === 'image/gif' && !me?.canUseGifs) {
+        alert("Vous n'avez pas l'autorisation d'utiliser des GIFs animés. Demandez au propriétaire !");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setProfileForm(prev => ({ ...prev, banner: reader.result as string }));
       };
       reader.readAsDataURL(file);
     }
@@ -491,6 +640,14 @@ export function ChatInterface({
 
       const videoTrack = stream.getVideoTracks()[0];
       
+      // Update my main stream for future calls
+      if (myStreamRef.current) {
+        myStreamRef.current.getVideoTracks().forEach(t => {
+          myStreamRef.current?.removeTrack(t);
+        });
+        myStreamRef.current.addTrack(videoTrack);
+      }
+
       // Replace or add video track in all active calls
       Object.values(callsRef.current).forEach((call: any) => {
         const senders = call.peerConnection.getSenders();
@@ -498,7 +655,7 @@ export function ChatInterface({
         if (videoSender) {
           videoSender.replaceTrack(videoTrack);
         } else {
-          call.peerConnection.addTrack(videoTrack, stream);
+          call.peerConnection.addTrack(videoTrack, myStreamRef.current!);
         }
       });
 
@@ -515,24 +672,32 @@ export function ChatInterface({
     screenStreamRef.current = null;
     setIsScreenSharing(false);
     
-    // Revert to camera if it was on, or just remove video track
-    Object.values(callsRef.current).forEach((call: any) => {
-      const senders = call.peerConnection.getSenders();
-      const videoSender = senders.find((s: any) => s.track?.kind === 'video');
-      if (videoSender) {
-        if (isCameraOn && myStreamRef.current?.getVideoTracks()[0]) {
-          videoSender.replaceTrack(myStreamRef.current.getVideoTracks()[0]);
-        } else {
+    // Remove screen track from my main stream
+    if (myStreamRef.current) {
+      myStreamRef.current.getVideoTracks().forEach(t => {
+        myStreamRef.current?.removeTrack(t);
+      });
+    }
+
+    // Revert to camera if it was on
+    if (isCameraOn) {
+      handleCamera(); // This will re-enable camera
+    } else {
+      // Just remove video track from all calls
+      Object.values(callsRef.current).forEach((call: any) => {
+        const senders = call.peerConnection.getSenders();
+        const videoSender = senders.find((s: any) => s.track?.kind === 'video');
+        if (videoSender) {
           call.peerConnection.removeTrack(videoSender);
         }
-      }
-    });
+      });
+    }
   };
 
   const handleCamera = async () => {
     if (!activeVoiceChannel) return;
     try {
-      if (isCameraOn) {
+      if (isCameraOn && !isScreenSharing) {
         const videoTrack = myStreamRef.current?.getVideoTracks()[0];
         if (videoTrack) {
           videoTrack.stop();
@@ -543,29 +708,39 @@ export function ChatInterface({
         Object.values(callsRef.current).forEach((call: any) => {
           const senders = call.peerConnection.getSenders();
           const videoSender = senders.find((s: any) => s.track?.kind === 'video');
-          if (videoSender && !isScreenSharing) {
+          if (videoSender) {
             call.peerConnection.removeTrack(videoSender);
           }
         });
         return;
       }
 
+      // If we were screen sharing, stop it first or just replace
+      if (isScreenSharing) {
+        stopScreenShare();
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       const videoTrack = stream.getVideoTracks()[0];
-      myStreamRef.current?.addTrack(videoTrack);
+      
+      if (myStreamRef.current) {
+        myStreamRef.current.getVideoTracks().forEach(t => {
+          myStreamRef.current?.removeTrack(t);
+        });
+        myStreamRef.current.addTrack(videoTrack);
+      }
+      
       setIsCameraOn(true);
 
-      if (!isScreenSharing) {
-        Object.values(callsRef.current).forEach((call: any) => {
-          const senders = call.peerConnection.getSenders();
-          const videoSender = senders.find((s: any) => s.track?.kind === 'video');
-          if (videoSender) {
-            videoSender.replaceTrack(videoTrack);
-          } else {
-            call.peerConnection.addTrack(videoTrack, myStreamRef.current!);
-          }
-        });
-      }
+      Object.values(callsRef.current).forEach((call: any) => {
+        const senders = call.peerConnection.getSenders();
+        const videoSender = senders.find((s: any) => s.track?.kind === 'video');
+        if (videoSender) {
+          videoSender.replaceTrack(videoTrack);
+        } else {
+          call.peerConnection.addTrack(videoTrack, myStreamRef.current!);
+        }
+      });
     } catch (err) {
       console.error("Camera error:", err);
       alert("Impossible d'accéder à la caméra.");
@@ -573,12 +748,23 @@ export function ChatInterface({
   };
 
   const addRemoteStream = (id: string, stream: MediaStream) => {
+    console.log(`[Voice] Adding remote stream for ${id}`, stream.getTracks().map(t => t.kind));
     remoteStreamsRef.current[id] = stream;
     setRemoteStreams(prev => prev + 1);
     
     const audio = new Audio();
     audio.srcObject = stream;
     audio.play().catch(e => console.error("Audio play failed", e));
+
+    // Listen for new tracks (like screen share being added later)
+    stream.onaddtrack = () => {
+      console.log(`[Voice] New track added to stream for ${id}`);
+      setRemoteStreams(prev => prev + 1);
+    };
+    stream.onremovetrack = () => {
+      console.log(`[Voice] Track removed from stream for ${id}`);
+      setRemoteStreams(prev => prev + 1);
+    };
   };
 
   const stopVoiceChat = () => {
@@ -652,6 +838,9 @@ export function ChatInterface({
             alt="FitCord" 
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = "https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg";
+            }}
           />
           {!activeServer && (
             <div className="absolute -left-2 w-1 h-8 bg-fit-primary rounded-r-full" />
@@ -713,18 +902,59 @@ export function ChatInterface({
 
       {/* 2. Channel/DM Sidebar (Middle) */}
       <div className="w-64 bg-fit-sidebar border-r border-fit-border flex flex-col z-20">
-        <div className="h-16 px-4 flex items-center border-b border-fit-border shadow-sm">
-          <span className="font-black text-lg tracking-tighter text-fit-text truncate">
-            {activeServer ? currentServer?.name : "Messages Directs"}
-          </span>
-          {activeServer && isOwner && !serverMembers.includes(username) && (
-            <button 
-              onClick={() => onJoinServer(activeServer)}
-              className="ml-auto bg-fit-primary text-white text-[10px] px-3 py-1.5 rounded-xl font-black uppercase tracking-widest hover:bg-fit-primary-hover transition-all"
-            >
-              Rejoindre
-            </button>
+        <div className="h-24 px-4 flex items-center border-b border-fit-border shadow-sm relative overflow-hidden group">
+          {activeServer && currentServer?.banner && (
+            <img 
+              src={currentServer.banner} 
+              alt="Server Banner" 
+              className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-60 transition-opacity" 
+              referrerPolicy="no-referrer"
+            />
           )}
+          <div className="relative z-10 flex items-center w-full">
+            <span className="font-black text-lg tracking-tighter text-fit-text truncate drop-shadow-md">
+              {activeServer ? currentServer?.name : "Messages Directs"}
+            </span>
+            {activeServer && isOwner && !serverMembers.includes(username) && (
+              <button 
+                onClick={() => onJoinServer(activeServer)}
+                className="ml-auto bg-fit-primary text-white text-[10px] px-3 py-1.5 rounded-xl font-black uppercase tracking-widest hover:bg-fit-primary-hover transition-all"
+              >
+                Rejoindre
+              </button>
+            )}
+            {activeServer && currentServer?.owner === username && (
+              <button 
+                onClick={() => setShowServerSettingsModal(true)}
+                className="ml-auto p-2 hover:bg-white/10 rounded-full transition-all text-fit-text"
+                title="Paramètres du Serveur"
+              >
+                <Settings size={18} />
+              </button>
+            )}
+            {activeServer && currentServer?.owner !== username && (me?.role === 'admin' || me?.role === 'owner' || me?.role === 'moderator') && (
+              <div className="ml-auto flex gap-1">
+                <button 
+                  onClick={() => {
+                    if (confirm("Réinitialiser l'icône du serveur ?")) onResetServerIcon(activeServer);
+                  }}
+                  className="p-2 hover:bg-white/10 rounded-full transition-all text-fit-text"
+                  title="Réinitialiser l'icône"
+                >
+                  <ImageIcon size={16} />
+                </button>
+                <button 
+                  onClick={() => {
+                    if (confirm("Réinitialiser la bannière du serveur ?")) onResetServerBanner(activeServer);
+                  }}
+                  className="p-2 hover:bg-white/10 rounded-full transition-all text-fit-text"
+                  title="Réinitialiser la bannière"
+                >
+                  <Monitor size={16} />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-6 discord-scrollbar">
@@ -1212,11 +1442,25 @@ export function ChatInterface({
                             
                             <div className="relative mb-8">
                               <div className={cn(
-                                "p-1.5 rounded-[3rem] transition-all duration-700 shadow-2xl",
+                                "p-1.5 rounded-[3rem] transition-all duration-700 shadow-2xl overflow-hidden",
                                 "bg-gradient-to-tr from-fit-primary to-emerald-400 group-hover:scale-110 group-hover:rotate-3",
                                 "ring-8 ring-emerald-500/5 group-hover:ring-emerald-500/20"
                               )}>
-                                {user?.avatar ? (
+                                {remoteStreamsRef.current[vu.sid] && remoteStreamsRef.current[vu.sid].getVideoTracks().length > 0 ? (
+                                  <div className="w-32 h-32 rounded-[2.6rem] overflow-hidden bg-black">
+                                    <RemoteVideo stream={remoteStreamsRef.current[vu.sid]} />
+                                  </div>
+                                ) : isMe && (isCameraOn || isScreenSharing) && (myStreamRef.current || screenStreamRef.current) ? (
+                                  <div className="w-32 h-32 rounded-[2.6rem] overflow-hidden bg-black">
+                                    <video 
+                                      autoPlay 
+                                      muted 
+                                      playsInline 
+                                      ref={el => { if(el) el.srcObject = isScreenSharing ? screenStreamRef.current : myStreamRef.current; }}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                ) : user?.avatar ? (
                                   <img src={user.avatar} alt={vu.username} className="w-32 h-32 rounded-[2.6rem] object-cover bg-fit-bg" referrerPolicy="no-referrer" />
                                 ) : (
                                   <div className="w-32 h-32 bg-fit-bg rounded-[2.6rem] flex items-center justify-center text-fit-muted font-black text-5xl">
@@ -1664,21 +1908,39 @@ export function ChatInterface({
                 )}
                 
                 {isOwner && (
-                  <button 
-                    onClick={() => {
-                      onToggleLargeVideo(selectedUser.username);
-                      setSelectedUser(null);
-                    }}
-                    className={cn(
-                      "w-full flex items-center justify-between p-4 rounded-2xl transition-all font-black text-xs uppercase tracking-widest group border",
-                      selectedUser.canSendLargeVideos 
-                        ? "bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white border-emerald-500/20" 
-                        : "bg-fit-bg hover:bg-fit-sidebar text-fit-muted border-fit-border"
-                    )}
-                  >
-                    <span>{selectedUser.canSendLargeVideos ? "Retirer Large Vidéo" : "Autoriser Large Vidéo"}</span>
-                    <Video size={18} className="group-hover:scale-110 transition-transform" />
-                  </button>
+                  <>
+                    <button 
+                      onClick={() => {
+                        onToggleLargeVideo(selectedUser.username);
+                        setSelectedUser(null);
+                      }}
+                      className={cn(
+                        "w-full flex items-center justify-between p-4 rounded-2xl transition-all font-black text-xs uppercase tracking-widest group border",
+                        selectedUser.canSendLargeVideos 
+                          ? "bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white border-emerald-500/20" 
+                          : "bg-fit-bg hover:bg-fit-sidebar text-fit-muted border-fit-border"
+                      )}
+                    >
+                      <span>{selectedUser.canSendLargeVideos ? "Retirer Large Vidéo" : "Autoriser Large Vidéo"}</span>
+                      <Video size={18} className="group-hover:scale-110 transition-transform" />
+                    </button>
+
+                    <button 
+                      onClick={() => {
+                        onToggleGifs(selectedUser.username);
+                        setSelectedUser(null);
+                      }}
+                      className={cn(
+                        "w-full flex items-center justify-between p-4 rounded-2xl transition-all font-black text-xs uppercase tracking-widest group border",
+                        selectedUser.canUseGifs 
+                          ? "bg-fit-primary/10 hover:bg-fit-primary text-fit-primary hover:text-white border-fit-primary/20" 
+                          : "bg-fit-bg hover:bg-fit-sidebar text-fit-muted border-fit-border"
+                      )}
+                    >
+                      <span>{selectedUser.canUseGifs ? "Retirer GIFs Animés" : "Autoriser GIFs Animés"}</span>
+                      <ImageIcon size={18} className="group-hover:scale-110 transition-transform" />
+                    </button>
+                  </>
                 )}
                 
                 <button 
@@ -1793,6 +2055,9 @@ export function ChatInterface({
                           alt="Logo" 
                           className="w-full h-full object-cover"
                           referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg";
+                          }}
                         />
                       </div>
                     </div>
@@ -1828,6 +2093,136 @@ export function ChatInterface({
         )}
       </AnimatePresence>
 
+      {/* Server Settings Modal */}
+      <AnimatePresence>
+        {showServerSettingsModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-fit-surface w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden border border-fit-border"
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-2xl font-black tracking-tight">Paramètres du Serveur</h2>
+                  <button onClick={() => setShowServerSettingsModal(false)} className="p-2 hover:bg-fit-bg rounded-full transition-all">
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleUpdateServer} className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="relative group">
+                      <div className="h-32 w-full bg-fit-bg rounded-2xl overflow-hidden border border-fit-border">
+                        {serverSettingsForm.banner ? (
+                          <img src={serverSettingsForm.banner} alt="Server Banner Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="w-full h-full bg-fit-primary opacity-20" />
+                        )}
+                      </div>
+                      <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-all cursor-pointer rounded-2xl">
+                        <ImageIcon size={24} className="text-white" />
+                        <input type="file" className="hidden" accept="image/*" onChange={handleServerBannerFileUpload} />
+                      </label>
+                      <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded-lg text-[8px] font-black text-white uppercase tracking-widest">Bannière du Serveur</div>
+                      {serverSettingsForm.banner && (
+                        <button 
+                          type="button"
+                          onClick={() => setServerSettingsForm(prev => ({ ...prev, banner: '' }))}
+                          className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-lg text-white hover:bg-fit-accent transition-all"
+                          title="Supprimer la bannière"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col items-center gap-4 -mt-12 relative z-10">
+                      <div className="relative group">
+                        <div className="w-24 h-24 rounded-[2rem] bg-fit-bg border-4 border-fit-surface shadow-xl overflow-hidden flex items-center justify-center text-fit-muted font-black text-3xl">
+                          {serverSettingsForm.icon ? (
+                            <img src={serverSettingsForm.icon} alt="Server Icon Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            serverSettingsForm.name[0]?.toUpperCase() || 'S'
+                          )}
+                        </div>
+                        <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-all cursor-pointer rounded-[2rem]">
+                          <Camera size={24} className="text-white" />
+                          <input type="file" className="hidden" accept="image/*" onChange={handleServerIconFileUpload} />
+                        </label>
+                        {serverSettingsForm.icon && (
+                          <button 
+                            type="button"
+                            onClick={() => setServerSettingsForm(prev => ({ ...prev, icon: '' }))}
+                            className="absolute -top-1 -right-1 bg-black/60 p-1.5 rounded-xl text-white hover:bg-fit-accent transition-all border-2 border-fit-surface"
+                            title="Supprimer l'icône"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[10px] font-black text-fit-muted uppercase tracking-widest">Icône du Serveur</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-fit-muted uppercase tracking-widest mb-2">Nom du Serveur</label>
+                    <input 
+                      type="text"
+                      value={serverSettingsForm.name}
+                      onChange={(e) => setServerSettingsForm(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full bg-fit-bg border border-fit-border rounded-2xl px-5 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-fit-primary/5 focus:border-fit-primary transition-all"
+                      placeholder="Nom du serveur"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-fit-muted uppercase tracking-widest mb-2">URL Icône</label>
+                      <input 
+                        type="text"
+                        value={serverSettingsForm.icon}
+                        onChange={(e) => setServerSettingsForm(prev => ({ ...prev, icon: e.target.value }))}
+                        className="w-full bg-fit-bg border border-fit-border rounded-2xl px-4 py-3 text-xs font-bold outline-none focus:ring-4 focus:ring-fit-primary/5 focus:border-fit-primary transition-all"
+                        placeholder="https://..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-fit-muted uppercase tracking-widest mb-2">URL Bannière</label>
+                      <input 
+                        type="text"
+                        value={serverSettingsForm.banner}
+                        onChange={(e) => setServerSettingsForm(prev => ({ ...prev, banner: e.target.value }))}
+                        className="w-full bg-fit-bg border border-fit-border rounded-2xl px-4 py-3 text-xs font-bold outline-none focus:ring-4 focus:ring-fit-primary/5 focus:border-fit-primary transition-all"
+                        placeholder="https://..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button 
+                      type="button"
+                      onClick={() => setShowServerSettingsModal(false)}
+                      className="flex-1 bg-fit-bg text-fit-text py-4 rounded-2xl font-black text-sm hover:bg-fit-sidebar transition-all"
+                    >
+                      Annuler
+                    </button>
+                    <button 
+                      type="submit"
+                      className="flex-[2] bg-fit-primary text-white py-4 rounded-2xl font-black text-sm shadow-lg shadow-fit-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    >
+                      Enregistrer
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Profile Edit Modal */}
       <AnimatePresence>
         {showProfileModal && (
@@ -1847,32 +2242,61 @@ export function ChatInterface({
                 </div>
 
                 <form onSubmit={handleUpdateProfile} className="space-y-6">
-                  <div className="flex flex-col items-center gap-4 mb-6">
+                  <div className="space-y-4">
                     <div className="relative group">
-                      <div className="w-24 h-24 rounded-[2rem] bg-fit-bg border-4 border-fit-surface shadow-xl overflow-hidden flex items-center justify-center text-fit-muted font-black text-3xl">
-                        {profileForm.avatar ? (
-                          <img src={profileForm.avatar} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <div className="h-32 w-full bg-fit-bg rounded-2xl overflow-hidden border border-fit-border">
+                        {profileForm.banner ? (
+                          <img src={profileForm.banner} alt="Banner Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
-                          username[0].toUpperCase()
+                          <div className="w-full h-full bg-fit-primary opacity-20" />
                         )}
                       </div>
-                      <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-all cursor-pointer rounded-[2rem]">
-                        <Camera size={24} className="text-white" />
-                        <input type="file" className="hidden" accept="image/*" onChange={handleAvatarFileUpload} />
+                      <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-all cursor-pointer rounded-2xl">
+                        <ImageIcon size={24} className="text-white" />
+                        <input type="file" className="hidden" accept="image/*" onChange={handleBannerFileUpload} />
                       </label>
+                      <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded-lg text-[8px] font-black text-white uppercase tracking-widest">Bannière</div>
                     </div>
-                    <p className="text-[10px] font-black text-fit-muted uppercase tracking-widest">Cliquez pour changer la photo</p>
+
+                    <div className="flex flex-col items-center gap-4 -mt-12 relative z-10">
+                      <div className="relative group">
+                        <div className="w-24 h-24 rounded-[2rem] bg-fit-bg border-4 border-fit-surface shadow-xl overflow-hidden flex items-center justify-center text-fit-muted font-black text-3xl">
+                          {profileForm.avatar ? (
+                            <img src={profileForm.avatar} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            username[0].toUpperCase()
+                          )}
+                        </div>
+                        <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-all cursor-pointer rounded-[2rem]">
+                          <Camera size={24} className="text-white" />
+                          <input type="file" className="hidden" accept="image/*" onChange={handleAvatarFileUpload} />
+                        </label>
+                      </div>
+                      <p className="text-[10px] font-black text-fit-muted uppercase tracking-widest">Cliquez pour changer</p>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[10px] font-black text-fit-muted uppercase tracking-widest mb-2">Ou URL de l'avatar</label>
-                    <input 
-                      type="text"
-                      value={profileForm.avatar}
-                      onChange={(e) => setProfileForm(prev => ({ ...prev, avatar: e.target.value }))}
-                      className="w-full bg-fit-bg border border-fit-border rounded-2xl px-5 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-fit-primary/5 focus:border-fit-primary transition-all"
-                      placeholder="https://..."
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-fit-muted uppercase tracking-widest mb-2">URL Avatar</label>
+                      <input 
+                        type="text"
+                        value={profileForm.avatar}
+                        onChange={(e) => setProfileForm(prev => ({ ...prev, avatar: e.target.value }))}
+                        className="w-full bg-fit-bg border border-fit-border rounded-2xl px-4 py-3 text-xs font-bold outline-none focus:ring-4 focus:ring-fit-primary/5 focus:border-fit-primary transition-all"
+                        placeholder="https://..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-fit-muted uppercase tracking-widest mb-2">URL Bannière</label>
+                      <input 
+                        type="text"
+                        value={profileForm.banner}
+                        onChange={(e) => setProfileForm(prev => ({ ...prev, banner: e.target.value }))}
+                        className="w-full bg-fit-bg border border-fit-border rounded-2xl px-4 py-3 text-xs font-bold outline-none focus:ring-4 focus:ring-fit-primary/5 focus:border-fit-primary transition-all"
+                        placeholder="https://..."
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-fit-muted uppercase tracking-widest mb-2">Nom d'affichage</label>
@@ -1916,7 +2340,11 @@ export function ChatInterface({
               exit={{ scale: 0.9, opacity: 0 }}
               className="bg-fit-surface w-full max-w-sm rounded-[3rem] shadow-2xl overflow-hidden border border-fit-border"
             >
-              <div className="h-24 bg-fit-primary" />
+              {viewingUser.banner ? (
+                <img src={viewingUser.banner} alt="Banner" className="h-32 w-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="h-32 bg-fit-primary" />
+              )}
               <div className="px-8 pb-8 -mt-12">
                 <div className="flex justify-between items-end mb-4">
                   <div className="relative">

@@ -34,7 +34,11 @@ export default function App() {
     updateStatus,
     onUpdateProfile,
     onUpdateAppLogo,
+    onUpdateServer,
+    onResetServerIcon,
+    onResetServerBanner,
     onToggleLargeVideo,
+    onToggleGifs,
     switchPrivateChat,
     kickUser,
     banUser,
@@ -113,7 +117,11 @@ export default function App() {
       onUpdateStatus={updateStatus}
       onUpdateProfile={onUpdateProfile}
       onUpdateAppLogo={onUpdateAppLogo}
+      onUpdateServer={onUpdateServer}
+      onResetServerIcon={onResetServerIcon}
+      onResetServerBanner={onResetServerBanner}
       onToggleLargeVideo={onToggleLargeVideo}
+      onToggleGifs={onToggleGifs}
       onSwitchPrivateChat={switchPrivateChat}
       onCreateServer={createServer}
       onInviteToServer={inviteToServer}

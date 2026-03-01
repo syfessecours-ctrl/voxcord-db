@@ -59,6 +59,7 @@ async function initDb() {
       name TEXT,
       owner TEXT,
       icon TEXT,
+      banner TEXT,
       timestamp TEXT
     );
 
@@ -87,8 +88,10 @@ async function initDb() {
       last_ip TEXT,
       display_name TEXT,
       avatar TEXT,
+      banner TEXT,
       bio TEXT,
-      can_send_large_videos BOOLEAN DEFAULT false
+      can_send_large_videos BOOLEAN DEFAULT false,
+      can_use_gifs BOOLEAN DEFAULT false
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -166,12 +169,15 @@ async function initDb() {
       { sql: "ALTER TABLE users ADD COLUMN display_name TEXT;", code: "42701" },
       { sql: "ALTER TABLE users ADD COLUMN avatar TEXT;", code: "42701" },
       { sql: "ALTER TABLE users ADD COLUMN bio TEXT;", code: "42701" },
+      { sql: "ALTER TABLE users ADD COLUMN banner TEXT;", code: "42701" },
+      { sql: "ALTER TABLE users ADD COLUMN can_use_gifs BOOLEAN DEFAULT false;", code: "42701" },
       { sql: "ALTER TABLE channels ADD COLUMN server_id TEXT;", code: "42701" },
       { sql: "ALTER TABLE channels ADD COLUMN locked BOOLEAN DEFAULT false;", code: "42701" },
       { sql: "ALTER TABLE channels ADD COLUMN lock_message TEXT DEFAULT 'Ce salon est verrouillé.';", code: "42701" },
       { sql: "ALTER TABLE channels ADD COLUMN background_url TEXT;", code: "42701" },
       { sql: "ALTER TABLE channels ADD COLUMN description TEXT;", code: "42701" },
-      { sql: "ALTER TABLE servers ADD COLUMN icon TEXT;", code: "42701" }
+      { sql: "ALTER TABLE servers ADD COLUMN icon TEXT;", code: "42701" },
+      { sql: "ALTER TABLE servers ADD COLUMN banner TEXT;", code: "42701" }
     ];
 
     for (const migration of migrations) {
@@ -194,10 +200,13 @@ async function initDb() {
       "ALTER TABLE channels ADD COLUMN background_url TEXT;",
       "ALTER TABLE channels ADD COLUMN description TEXT;",
       "ALTER TABLE servers ADD COLUMN icon TEXT;",
+      "ALTER TABLE servers ADD COLUMN banner TEXT;",
       "ALTER TABLE users ADD COLUMN display_name TEXT;",
       "ALTER TABLE users ADD COLUMN avatar TEXT;",
       "ALTER TABLE users ADD COLUMN bio TEXT;",
-      "ALTER TABLE users ADD COLUMN can_send_large_videos BOOLEAN DEFAULT false;"
+      "ALTER TABLE users ADD COLUMN banner TEXT;",
+      "ALTER TABLE users ADD COLUMN can_send_large_videos BOOLEAN DEFAULT false;",
+      "ALTER TABLE users ADD COLUMN can_use_gifs BOOLEAN DEFAULT false;"
     ];
 
     for (const sql of sqliteMigrations) {
@@ -233,6 +242,20 @@ async function startServer() {
     // Health check endpoint for Render keep-alive
     app.get("/api/health", (req, res) => {
       res.json({ status: "ok", timestamp: new Date().toISOString() });
+    });
+
+    app.get("/api/config", async (req, res) => {
+      try {
+        const configRows = await query("SELECT key, value FROM app_config");
+        const config: Record<string, string> = {};
+        configRows.forEach((row: any) => {
+          config[row.key] = row.value;
+        });
+        res.json(config);
+      } catch (err) {
+        console.error("Error fetching config:", err);
+        res.status(500).json({ error: "Internal server error" });
+      }
     });
 
     // File Upload Setup
@@ -350,8 +373,10 @@ async function startServer() {
         status: 'online',
         displayName: userRecord.display_name,
         avatar: userRecord.avatar,
+        banner: userRecord.banner,
         bio: userRecord.bio,
-        canSendLargeVideos: !!userRecord.can_send_large_videos
+        canSendLargeVideos: !!userRecord.can_send_large_videos,
+        canUseGifs: !!userRecord.can_use_gifs
       });
       socket.join('general');
       
@@ -360,8 +385,10 @@ async function startServer() {
         role: userRecord.role,
         displayName: userRecord.display_name,
         avatar: userRecord.avatar,
+        banner: userRecord.banner,
         bio: userRecord.bio,
-        canSendLargeVideos: !!userRecord.can_send_large_videos
+        canSendLargeVideos: !!userRecord.can_send_large_videos,
+        canUseGifs: !!userRecord.can_use_gifs
       });
       
       // Auto-join global server members if not already
@@ -473,6 +500,78 @@ async function startServer() {
       } catch (err) {
         console.error("[SERVER_ERROR] Failed to create server:", err);
         socket.emit("error", "Erreur lors de la création du serveur.");
+      }
+    });
+
+    socket.on("update_server", async ({ serverId, name, icon, banner }) => {
+      const user = users.get(socket.id);
+      if (!user) return;
+
+      const server = await getOne("SELECT * FROM servers WHERE id = ?", [serverId]);
+      if (!server || server.owner !== user.username) return;
+
+      await execute("UPDATE servers SET name = ?, icon = ?, banner = ? WHERE id = ?", [name, icon, banner, serverId]);
+      
+      // Update all users about the server update
+      const allServers = await query("SELECT * FROM servers");
+      for (const [sid, u] of users.entries()) {
+        if (u.role === 'owner') {
+          io.to(sid).emit("server_list", allServers);
+        } else {
+          const userServers = await query(`
+            SELECT s.* FROM servers s
+            JOIN server_members sm ON s.id = sm.server_id
+            WHERE sm.username = ?
+          `, [u.username]);
+          io.to(sid).emit("server_list", userServers);
+        }
+      }
+      
+      // Notify members of this server specifically
+      io.to(serverId).emit("server_updated", { id: serverId, name, icon, banner });
+    });
+
+    socket.on("mod_reset_server_icon", async (serverId) => {
+      const user = users.get(socket.id);
+      if (!user || (user.role !== 'admin' && user.role !== 'owner' && user.role !== 'moderator')) return;
+
+      await execute("UPDATE servers SET icon = NULL WHERE id = ?", [serverId]);
+      
+      // Update all users
+      const allServers = await query("SELECT * FROM servers");
+      for (const [sid, u] of users.entries()) {
+        if (u.role === 'owner') {
+          io.to(sid).emit("server_list", allServers);
+        } else {
+          const userServers = await query(`
+            SELECT s.* FROM servers s
+            JOIN server_members sm ON s.id = sm.server_id
+            WHERE sm.username = ?
+          `, [u.username]);
+          io.to(sid).emit("server_list", userServers);
+        }
+      }
+    });
+
+    socket.on("mod_reset_server_banner", async (serverId) => {
+      const user = users.get(socket.id);
+      if (!user || (user.role !== 'admin' && user.role !== 'owner' && user.role !== 'moderator')) return;
+
+      await execute("UPDATE servers SET banner = NULL WHERE id = ?", [serverId]);
+      
+      // Update all users
+      const allServers = await query("SELECT * FROM servers");
+      for (const [sid, u] of users.entries()) {
+        if (u.role === 'owner') {
+          io.to(sid).emit("server_list", allServers);
+        } else {
+          const userServers = await query(`
+            SELECT s.* FROM servers s
+            JOIN server_members sm ON s.id = sm.server_id
+            WHERE sm.username = ?
+          `, [u.username]);
+          io.to(sid).emit("server_list", userServers);
+        }
       }
     });
 
@@ -590,17 +689,18 @@ async function startServer() {
       }
     });
 
-    socket.on("update_profile", async ({ displayName, avatar, bio }) => {
+    socket.on("update_profile", async ({ displayName, avatar, banner, bio }) => {
       const user = users.get(socket.id);
       if (!user) return;
 
-      await execute("UPDATE users SET display_name = ?, avatar = ?, bio = ? WHERE username = ?", [displayName, avatar, bio, user.username]);
+      await execute("UPDATE users SET display_name = ?, avatar = ?, banner = ?, bio = ? WHERE username = ?", [displayName, avatar, banner, bio, user.username]);
       
       // Update ALL sockets for this user
       for (const [sid, u] of users.entries()) {
         if (u.username === user.username) {
           u.displayName = displayName;
           u.avatar = avatar;
+          u.banner = banner;
           u.bio = bio;
           
           io.to(sid).emit("me", { 
@@ -608,7 +708,10 @@ async function startServer() {
             role: u.role,
             displayName,
             avatar,
-            bio
+            banner,
+            bio,
+            canSendLargeVideos: u.canSendLargeVideos,
+            canUseGifs: u.canUseGifs
           });
         }
       }
@@ -620,6 +723,7 @@ async function startServer() {
         username: user.username,
         displayName,
         avatar,
+        banner,
         bio
       });
     });
@@ -912,14 +1016,47 @@ async function startServer() {
             role: u.role,
             displayName: u.displayName,
             avatar: u.avatar,
+            banner: u.banner,
             bio: u.bio,
-            canSendLargeVideos: newValue
+            canSendLargeVideos: newValue,
+            canUseGifs: u.canUseGifs
           });
         }
       }
       await broadcastUserList();
       
       await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'toggle_large_video', targetUsername, `Large video permission set to ${newValue}`, new Date().toISOString()]);
+    });
+
+    socket.on("mod_toggle_gifs", async (targetUsername) => {
+      const admin = users.get(socket.id);
+      if (!admin || admin.role !== 'owner') return;
+
+      const target = await getOne("SELECT can_use_gifs FROM users WHERE username = ?", [targetUsername]);
+      if (!target) return;
+
+      const newValue = !target.can_use_gifs;
+      await execute("UPDATE users SET can_use_gifs = ? WHERE username = ?", [newValue, targetUsername]);
+
+      // Update online users
+      for (const [sid, u] of users.entries()) {
+        if (u.username === targetUsername) {
+          u.canUseGifs = newValue;
+          io.to(sid).emit("me", { 
+            username: u.username, 
+            role: u.role,
+            displayName: u.displayName,
+            avatar: u.avatar,
+            banner: u.banner,
+            bio: u.bio,
+            canSendLargeVideos: u.canSendLargeVideos,
+            canUseGifs: newValue
+          });
+        }
+      }
+      await broadcastUserList();
+      
+      await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'toggle_gifs', targetUsername, `GIF permission set to ${newValue}`, new Date().toISOString()]);
     });
 
     socket.on("mod_join_server", async (serverId) => {

@@ -6,8 +6,10 @@ export interface User {
   status?: 'online' | 'offline' | 'away';
   displayName?: string;
   avatar?: string;
+  banner?: string;
   bio?: string;
   canSendLargeVideos?: boolean;
+  canUseGifs?: boolean;
 }
 
 export interface FriendRequest {
@@ -39,6 +41,7 @@ export interface Server {
   name: string;
   owner: string;
   icon?: string;
+  banner?: string;
 }
 
 export interface Channel {

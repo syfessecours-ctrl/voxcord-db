@@ -35,6 +35,22 @@ export function useSocket(username: string) {
     activePrivateChatRef.current = activePrivateChat;
   }, [activePrivateChat]);
 
+  useEffect(() => {
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(config => setAppConfig(config))
+      .catch(err => console.error("Error fetching initial config:", err));
+  }, []);
+
+  // Auto-connect if credentials exist
+  useEffect(() => {
+    const savedUser = localStorage.getItem('vox_username');
+    const savedPass = localStorage.getItem('vox_password');
+    if (savedUser && savedPass && !socketRef.current) {
+      connect(savedUser, savedPass);
+    }
+  }, []);
+
   const connect = (u: string, p: string) => {
     const newSocket = io(window.location.origin);
     socketRef.current = newSocket;
@@ -66,7 +82,15 @@ export function useSocket(username: string) {
 
     newSocket.on('user_list', (list) => setUsers(list));
     newSocket.on('server_list', (list) => setServers(list));
-    newSocket.on('channel_list', (list) => setChannels(list));
+    newSocket.on('channel_list', (list) => {
+      setChannels(list);
+      // Auto-select first channel if none is active (e.g. after switching server)
+      if (activeChannelRef.current === '' && list.length > 0) {
+        const first = list[0];
+        setActiveChannel(first.id);
+        newSocket.emit('switch_channel', first.id);
+      }
+    });
     newSocket.on('friend_list', (list) => setFriends(list));
     newSocket.on('friend_requests', (list) => setFriendRequests(list));
 
@@ -178,13 +202,13 @@ export function useSocket(username: string) {
   };
 
   const switchServer = (serverId: string | null) => {
+    if (serverId === activeServer) return;
     setActiveServer(serverId);
     setActiveChannel('');
     setMessages([]);
+    setChannels([]); // Clear channels immediately to avoid showing stale data from previous server
     if (serverId) {
       socketRef.current?.emit('get_server_channels', serverId);
-    } else {
-      setChannels([]);
     }
   };
 
@@ -211,7 +235,7 @@ export function useSocket(username: string) {
     socketRef.current?.emit('update_status', status);
   };
 
-  const updateProfile = (profile: { displayName?: string, avatar?: string, bio?: string }) => {
+  const updateProfile = (profile: { displayName?: string, avatar?: string, banner?: string, bio?: string }) => {
     socketRef.current?.emit('update_profile', profile);
   };
 
@@ -276,6 +300,22 @@ export function useSocket(username: string) {
 
   const toggleLargeVideo = (targetUsername: string) => {
     socketRef.current?.emit('mod_toggle_large_video', targetUsername);
+  };
+
+  const toggleGifs = (targetUsername: string) => {
+    socketRef.current?.emit('mod_toggle_gifs', targetUsername);
+  };
+
+  const updateServer = (serverId: string, name: string, icon: string, banner: string) => {
+    socketRef.current?.emit('update_server', { serverId, name, icon, banner });
+  };
+
+  const resetServerIcon = (serverId: string) => {
+    socketRef.current?.emit('mod_reset_server_icon', serverId);
+  };
+
+  const resetServerBanner = (serverId: string) => {
+    socketRef.current?.emit('mod_reset_server_banner', serverId);
   };
 
   const switchChannel = (id: string) => {
@@ -356,7 +396,11 @@ export function useSocket(username: string) {
     updateStatus,
     onUpdateProfile: updateProfile,
     onUpdateAppLogo: updateAppLogo,
+    onUpdateServer: updateServer,
+    onResetServerIcon: resetServerIcon,
+    onResetServerBanner: resetServerBanner,
     onToggleLargeVideo: toggleLargeVideo,
+    onToggleGifs: toggleGifs,
     switchPrivateChat,
     kickUser,
     banUser,

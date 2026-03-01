@@ -12,11 +12,18 @@ interface LoginProps {
 export function Login({ onLogin, error, initialUsername, logoUrl }: LoginProps) {
   const [username, setUsername] = useState(initialUsername);
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     onLogin(username, password);
   };
+
+  // Reset loading if error occurs
+  React.useEffect(() => {
+    if (error) setIsLoading(false);
+  }, [error]);
 
   const defaultLogo = "https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg";
 
@@ -34,6 +41,9 @@ export function Login({ onLogin, error, initialUsername, logoUrl }: LoginProps) 
               alt="FitCord Logo" 
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = defaultLogo;
+              }}
             />
           </div>
           <h1 className="text-3xl font-bold text-fit-text tracking-tight uppercase">FitCord</h1>
@@ -64,9 +74,17 @@ export function Login({ onLogin, error, initialUsername, logoUrl }: LoginProps) 
           {error && <p className="text-fit-accent text-xs font-bold text-center uppercase tracking-widest">{error}</p>}
           <button 
             type="submit"
-            className="w-full bg-fit-primary text-white font-black text-xs tracking-widest py-5 rounded-2xl shadow-xl shadow-fit-primary/20 hover:bg-fit-primary-hover hover:-translate-y-1 active:translate-y-0 transition-all"
+            disabled={isLoading}
+            className="w-full bg-fit-primary text-white font-black text-xs tracking-widest py-5 rounded-2xl shadow-xl shadow-fit-primary/20 hover:bg-fit-primary-hover hover:-translate-y-1 active:translate-y-0 transition-all disabled:opacity-70 disabled:translate-y-0 disabled:cursor-not-allowed flex items-center justify-center gap-3"
           >
-            SE CONNECTER
+            {isLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                CONNEXION...
+              </>
+            ) : (
+              "SE CONNECTER"
+            )}
           </button>
         </form>
       </motion.div>
