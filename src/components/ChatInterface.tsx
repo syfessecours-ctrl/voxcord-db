@@ -3644,7 +3644,7 @@ export function ChatInterface({
                   <div className="absolute inset-0 z-0 overflow-hidden">
                       <AnimatePresence mode="wait">
                         <motion.div
-                          key={privateCall.banner || appConfig.default_call_banner || 'global'}
+                          key={appConfig.default_call_banner || privateCall.banner || 'global'}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}

@@ -48,6 +48,12 @@ export function useSocket(username: string) {
 
   // Auto-connect if credentials exist
   useEffect(() => {
+    // Fetch initial config via HTTP
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(config => setAppConfig(config))
+      .catch(err => console.error("Error fetching app config:", err));
+
     const savedUser = localStorage.getItem('vox_username');
     const savedPass = localStorage.getItem('vox_password');
     if (savedUser && savedPass && !socketRef.current) {
