@@ -78,6 +78,8 @@ export default function App() {
     leaveVoice,
     sendVoiceSignal,
     onMuteToggle,
+    onCameraToggle,
+    onScreenShareToggle,
     initPrivateCall,
     acceptPrivateCall,
     rejectPrivateCall,
@@ -204,6 +206,8 @@ export default function App() {
         onCreateChannel={createChannel}
         onSwitchServer={switchServer}
         onMuteToggle={onMuteToggle}
+        onCameraToggle={onCameraToggle}
+        onScreenShareToggle={onScreenShareToggle}
         onInitPrivateCall={initPrivateCall}
         onAcceptPrivateCall={acceptPrivateCall}
         onRejectPrivateCall={rejectPrivateCall}

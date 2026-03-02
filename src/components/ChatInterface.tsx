@@ -34,6 +34,7 @@ import {
   Monitor,
   Minimize2,
   Maximize2,
+  Maximize,
   Phone,
   Type,
   FileText,
@@ -42,6 +43,10 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { User, Channel, Message, Friend, FriendRequest, PrivateMessage, Server as ServerType } from '../types';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
+import EmojiPicker, { Theme } from 'emoji-picker-react';
 
 interface ChatInterfaceProps {
   username: string;
@@ -62,8 +67,8 @@ interface ChatInterfaceProps {
   activeChannel: string;
   activePrivateChat: string | null;
   activeVoiceChannel: string | null;
-  voiceUsers: { sid: string, username: string, isMuted?: boolean }[];
-  voiceStates: Record<string, { sid: string, username: string, isMuted?: boolean }[]>;
+  voiceUsers: { sid: string, username: string, isMuted?: boolean, isCameraOn?: boolean, isScreenSharing?: boolean }[];
+  voiceStates: Record<string, { sid: string, username: string, isMuted?: boolean, isCameraOn?: boolean, isScreenSharing?: boolean }[]>;
   appConfig: Record<string, string>;
   onSendMessage: (text?: string, file?: string | ArrayBuffer | null) => void;
   onSwitchChannel: (id: string) => void;
@@ -111,6 +116,8 @@ interface ChatInterfaceProps {
   onInviteToServer: (serverId: string, targetUsername: string) => void;
   onSwitchServer: (id: string | null) => void;
   onMuteToggle: (channelId: string, isMuted: boolean) => void;
+  onCameraToggle: (channelId: string, isCameraOn: boolean) => void;
+  onScreenShareToggle: (channelId: string, isScreenSharing: boolean) => void;
   onInitPrivateCall: (to: string, peerId: string) => void;
   onAcceptPrivateCall: (to: string, peerId: string) => void;
   onRejectPrivateCall: (to: string) => void;
@@ -257,6 +264,9 @@ export function ChatInterface({
   onJoinVoice,
   onLeaveVoice,
   onSendVoiceSignal,
+  onMuteToggle,
+  onCameraToggle,
+  onScreenShareToggle,
   onLogout,
   me,
   onKickUser,
@@ -297,7 +307,6 @@ export function ChatInterface({
   onCreateChannel,
   onInviteToServer,
   onSwitchServer,
-  onMuteToggle,
   onInitPrivateCall,
   onAcceptPrivateCall,
   onRejectPrivateCall,
@@ -435,6 +444,8 @@ export function ChatInterface({
   const [showAnimeAnimation, setShowAnimeAnimation] = useState(false);
   const [lastAnimatedChannel, setLastAnimatedChannel] = useState<string | null>(null);
   const [showModPanel, setShowModPanel] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [watchingUser, setWatchingUser] = useState<{ sid: string, username: string } | null>(null);
   const [modPanelTab, setModPanelTab] = useState<'logs' | 'bans' | 'kicks' | 'stats'>('logs');
   const [roleColorInput, setRoleColorInput] = useState('#ffffff');
 
@@ -1148,6 +1159,7 @@ export function ChatInterface({
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       screenStreamRef.current = stream;
       setIsScreenSharing(true);
+      if (activeVoiceChannel) onScreenShareToggle(activeVoiceChannel, true);
 
       const videoTrack = stream.getVideoTracks()[0];
       
@@ -1182,6 +1194,7 @@ export function ChatInterface({
     screenStreamRef.current?.getTracks().forEach(track => track.stop());
     screenStreamRef.current = null;
     setIsScreenSharing(false);
+    if (activeVoiceChannel) onScreenShareToggle(activeVoiceChannel, false);
     
     // Remove screen track from my main stream
     if (myStreamRef.current) {
@@ -1215,6 +1228,7 @@ export function ChatInterface({
           myStreamRef.current?.removeTrack(videoTrack);
         }
         setIsCameraOn(false);
+        if (activeVoiceChannel) onCameraToggle(activeVoiceChannel, false);
         
         Object.values(callsRef.current).forEach((call: any) => {
           const senders = call.peerConnection.getSenders();
@@ -1242,6 +1256,7 @@ export function ChatInterface({
       }
       
       setIsCameraOn(true);
+      if (activeVoiceChannel) onCameraToggle(activeVoiceChannel, true);
 
       Object.values(callsRef.current).forEach((call: any) => {
         const senders = call.peerConnection.getSenders();
@@ -2084,6 +2099,25 @@ export function ChatInterface({
                               </div>
                             )}
 
+                            {isMe && isScreenSharing && (
+                              <div className="absolute top-6 left-6 px-4 py-1.5 bg-fit-primary/80 text-white rounded-xl backdrop-blur-md flex items-center gap-2">
+                                <Monitor size={12} />
+                                <span className="text-[9px] font-black uppercase tracking-widest">En direct</span>
+                              </div>
+                            )}
+
+                            {!isMe && vu.isScreenSharing && (
+                              <button 
+                                onClick={() => setWatchingUser(vu)}
+                                className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3 z-30 backdrop-blur-sm"
+                              >
+                                <div className="w-16 h-16 bg-fit-primary text-white rounded-[2rem] flex items-center justify-center shadow-2xl transform scale-90 group-hover:scale-100 transition-all duration-500">
+                                  <Monitor size={32} />
+                                </div>
+                                <span className="text-white font-black text-xs uppercase tracking-[0.2em] drop-shadow-lg">Regarder le partage</span>
+                              </button>
+                            )}
+
                             {/* Decorative Corner Elements */}
                             <div className="absolute top-0 left-0 w-16 h-16 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                           </motion.div>
@@ -2247,7 +2281,11 @@ export function ChatInterface({
                                 "px-5 py-3.5 rounded-2xl text-sm leading-relaxed break-words shadow-sm border",
                                 isMe ? "bg-fit-primary text-white border-fit-primary/20 rounded-tr-none" : "bg-fit-surface text-fit-text border-fit-border rounded-tl-none"
                               )}>
-                                {msg.text}
+                                <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-p:my-0 prose-strong:text-inherit prose-strong:font-black">
+                                  <Markdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                                    {msg.text}
+                                  </Markdown>
+                                </div>
                                 {msg.file && (
                                   <div className="mt-3 rounded-xl overflow-hidden border border-white/10 max-w-md shadow-lg">
                                     {(msg.file.startsWith('data:image') || msg.file.match(/\.(jpg|jpeg|png|gif|webp)$/i) || msg.file.includes('/uploads/')) && !msg.file.match(/\.(mp4|webm|ogg|mov)$/i) ? (
@@ -2342,22 +2380,65 @@ export function ChatInterface({
                             </div>
                           )}
                         </label>
-                        <input 
-                          type="text"
-                          value={inputText}
-                          onChange={(e) => setInputText(e.target.value)}
-                          disabled={currentChannel?.locked && !isOwner && me?.role !== 'moderator'}
-                          placeholder={
-                            currentChannel?.locked && !isOwner && me?.role !== 'moderator' 
-                              ? (currentChannel.lock_message || "Ce salon est verrouillé.") 
-                              : (activePrivateChat ? `Message à @${activePrivateChat}` : `Message dans #${currentChannel?.name}`)
-                          }
-                          className="flex-1 bg-transparent border-none outline-none text-fit-text py-3 px-2 text-sm font-bold placeholder:text-fit-muted/50 disabled:opacity-50"
-                        />
-                        <div className="flex items-center gap-1">
-                          <button type="button" className="w-12 h-12 flex items-center justify-center text-fit-muted hover:text-fit-primary hover:bg-fit-primary/5 rounded-full transition-all">
+                        <div className="flex-1 relative flex items-center">
+                          <textarea 
+                            value={inputText}
+                            onChange={(e) => setInputText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSendMessage(e as any);
+                              }
+                            }}
+                            disabled={currentChannel?.locked && !isOwner && me?.role !== 'moderator'}
+                            placeholder={
+                              currentChannel?.locked && !isOwner && me?.role !== 'moderator' 
+                                ? (currentChannel.lock_message || "Ce salon est verrouillé.") 
+                                : (activePrivateChat ? `Message à @${activePrivateChat}` : `Message dans #${currentChannel?.name}`)
+                            }
+                            rows={1}
+                            className="flex-1 bg-transparent border-none outline-none text-fit-text py-3 px-2 text-sm font-bold placeholder:text-fit-muted/50 disabled:opacity-50 resize-none max-h-32 discord-scrollbar"
+                            style={{ height: 'auto' }}
+                            ref={(el) => {
+                              if (el) {
+                                el.style.height = 'auto';
+                                el.style.height = `${el.scrollHeight}px`;
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="flex items-center gap-1 relative">
+                          <button 
+                            type="button" 
+                            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                            className={cn(
+                              "w-12 h-12 flex items-center justify-center transition-all rounded-full",
+                              showEmojiPicker ? "text-fit-primary bg-fit-primary/10" : "text-fit-muted hover:text-fit-primary hover:bg-fit-primary/5"
+                            )}
+                          >
                             <Smile size={24} />
                           </button>
+                          
+                          <AnimatePresence>
+                            {showEmojiPicker && (
+                              <motion.div 
+                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                className="absolute bottom-16 right-0 z-50 shadow-2xl rounded-3xl overflow-hidden border border-fit-border"
+                              >
+                                <EmojiPicker 
+                                  theme={Theme.DARK}
+                                  onEmojiClick={(emojiData) => {
+                                    setInputText(prev => prev + emojiData.emoji);
+                                    setShowEmojiPicker(false);
+                                  }}
+                                  lazyLoadEmojis={true}
+                                />
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+
                           <button type="submit" disabled={!inputText.trim()} className="w-12 h-12 flex items-center justify-center bg-fit-primary text-white rounded-full hover:bg-fit-primary-hover hover:scale-105 active:scale-95 transition-all shadow-lg shadow-fit-primary/20 disabled:opacity-50 disabled:hover:scale-100">
                             <Send size={20} />
                           </button>
@@ -3891,6 +3972,75 @@ export function ChatInterface({
       </AnimatePresence>
 
       {/* Moderation Panel Modal */}
+      {/* Watching Overlay */}
+      <AnimatePresence>
+        {watchingUser && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/95 flex flex-col"
+          >
+            {/* Header */}
+            <div className="h-20 border-b border-white/10 flex items-center justify-between px-12 bg-black/40 backdrop-blur-xl">
+              <div className="flex items-center gap-6">
+                <div className="w-12 h-12 bg-fit-primary text-white rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(139,92,246,0.3)]">
+                  <Monitor size={24} />
+                </div>
+                <div>
+                  <h3 className="text-white font-black text-lg uppercase tracking-widest">Partage d'écran de @{watchingUser.username}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
+                    <span className="text-red-500 font-black text-[10px] uppercase tracking-widest">En direct</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => {
+                    const video = document.getElementById('watching-video') as HTMLVideoElement;
+                    if (video) {
+                      if (video.requestFullscreen) {
+                        video.requestFullscreen();
+                      } else if ((video as any).webkitRequestFullscreen) {
+                        (video as any).webkitRequestFullscreen();
+                      }
+                    }
+                  }}
+                  className="p-4 bg-white/5 text-white hover:bg-white/10 rounded-2xl transition-all group"
+                  title="Plein écran"
+                >
+                  <Maximize size={24} className="group-hover:scale-110 transition-transform" />
+                </button>
+                <button 
+                  onClick={() => setWatchingUser(null)}
+                  className="p-4 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-2xl transition-all group"
+                >
+                  <X size={24} className="group-hover:rotate-90 transition-transform" />
+                </button>
+              </div>
+            </div>
+
+            {/* Video Container */}
+            <div className="flex-1 flex items-center justify-center p-12 overflow-hidden bg-[radial-gradient(circle_at_center,_rgba(139,92,246,0.05)_0%,_transparent_70%)]">
+              <div className="relative w-full h-full max-w-7xl aspect-video bg-black rounded-[3rem] overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.7)] border border-white/5">
+                <video 
+                  id="watching-video"
+                  autoPlay 
+                  playsInline 
+                  className="w-full h-full object-contain"
+                  ref={el => {
+                    if (el && watchingUser) {
+                      el.srcObject = remoteStreamsRef.current[watchingUser.sid] || null;
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {showModPanel && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] flex items-center justify-center p-4">

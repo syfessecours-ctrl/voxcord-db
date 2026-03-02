@@ -313,7 +313,7 @@ async function startServer() {
     });
 
   const users = new Map(); // socket.id -> user info
-  const voiceStates = new Map(); // channelId -> Set of { sid, username, isMuted }
+  const voiceStates = new Map(); // channelId -> Set of { sid, username, isMuted, isCameraOn, isScreenSharing }
 
   const getAppConfig = async () => {
     const rows = await query("SELECT * FROM app_config");
@@ -698,7 +698,7 @@ async function startServer() {
       Array.from(channelSet).forEach((u: any) => {
         if (u.sid === socket.id) channelSet.delete(u);
       });
-      channelSet.add({ sid: socket.id, username: user.username, isMuted: false });
+      channelSet.add({ sid: socket.id, username: user.username, isMuted: false, isCameraOn: false, isScreenSharing: false });
       
       const currentUsers = Array.from(channelSet);
       io.emit("voice_state_update", { channelId, users: currentUsers });
@@ -737,10 +737,37 @@ async function startServer() {
 
       const channelSet = voiceStates.get(channelId);
       if (channelSet) {
-        // Update the user's mute status in the set
         const userInChannel = Array.from(channelSet).find((u: any) => u.sid === socket.id);
         if (userInChannel) {
           (userInChannel as any).isMuted = isMuted;
+          io.emit("voice_state_update", { channelId, users: Array.from(channelSet) });
+        }
+      }
+    });
+
+    socket.on("voice_camera_toggle", ({ channelId, isCameraOn }) => {
+      const user = users.get(socket.id);
+      if (!user || !channelId) return;
+
+      const channelSet = voiceStates.get(channelId);
+      if (channelSet) {
+        const userInChannel = Array.from(channelSet).find((u: any) => u.sid === socket.id);
+        if (userInChannel) {
+          (userInChannel as any).isCameraOn = isCameraOn;
+          io.emit("voice_state_update", { channelId, users: Array.from(channelSet) });
+        }
+      }
+    });
+
+    socket.on("voice_screen_share_toggle", ({ channelId, isScreenSharing }) => {
+      const user = users.get(socket.id);
+      if (!user || !channelId) return;
+
+      const channelSet = voiceStates.get(channelId);
+      if (channelSet) {
+        const userInChannel = Array.from(channelSet).find((u: any) => u.sid === socket.id);
+        if (userInChannel) {
+          (userInChannel as any).isScreenSharing = isScreenSharing;
           io.emit("voice_state_update", { channelId, users: Array.from(channelSet) });
         }
       }

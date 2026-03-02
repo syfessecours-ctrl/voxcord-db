@@ -569,6 +569,12 @@ export function useSocket(username: string) {
     onMuteToggle: (channelId: string, isMuted: boolean) => {
       socketRef.current?.emit('voice_mute_toggle', { channelId, isMuted });
     },
+    onCameraToggle: (channelId: string, isCameraOn: boolean) => {
+      socketRef.current?.emit('voice_camera_toggle', { channelId, isCameraOn });
+    },
+    onScreenShareToggle: (channelId: string, isScreenSharing: boolean) => {
+      socketRef.current?.emit('voice_screen_share_toggle', { channelId, isScreenSharing });
+    },
     updateCallSettings,
     initPrivateCall,
     acceptPrivateCall,
