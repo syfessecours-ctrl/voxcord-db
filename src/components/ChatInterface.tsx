@@ -95,6 +95,7 @@ interface ChatInterfaceProps {
   onUpdateAppLogo: (logoUrl: string) => void;
   onUpdateAppRingtone: (ringtoneUrl: string) => void;
   onUpdateAppCallBanner: (bannerUrl: string) => void;
+  onUpdateKickConfig: (config: { title?: string, message?: string, image?: string }) => void;
   onUpdateServer: (serverId: string, name: string, icon: string, banner: string) => void;
   onResetServerIcon: (serverId: string) => void;
   onResetServerBanner: (serverId: string) => void;
@@ -278,6 +279,7 @@ export function ChatInterface({
   onUpdateAppLogo,
   onUpdateAppRingtone,
   onUpdateAppCallBanner,
+  onUpdateKickConfig,
   onUpdateServer,
   onResetServerIcon,
   onResetServerBanner,
@@ -2833,6 +2835,73 @@ export function ChatInterface({
                       >
                         Changer l'image globale d'appel
                       </button>
+                    </div>
+                  </div>
+                )}
+
+                {isOwner && (
+                  <div className="p-6 bg-fit-bg rounded-[2rem] border border-fit-border">
+                    <div className="mb-6">
+                      <div className="text-sm font-black text-fit-text mb-1">Configuration Écran de Kick</div>
+                      <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Kick Screen Customization</div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="block text-[10px] font-black text-fit-muted uppercase tracking-[0.2em] ml-1">Titre de l'écran</label>
+                        <input 
+                          type="text"
+                          defaultValue={appConfig.kick_title || "Pause Communautaire"}
+                          onBlur={(e) => onUpdateKickConfig({ title: e.target.value })}
+                          className="w-full bg-fit-surface border border-fit-border rounded-xl p-3 text-xs text-fit-text outline-none focus:border-fit-primary transition-all"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-[10px] font-black text-fit-muted uppercase tracking-[0.2em] ml-1">Message d'exclusion</label>
+                        <textarea 
+                          defaultValue={appConfig.kick_message || "Votre accès est temporairement restreint pour permettre à l'atmosphère du salon de s'apaiser."}
+                          onBlur={(e) => onUpdateKickConfig({ message: e.target.value })}
+                          className="w-full bg-fit-surface border border-fit-border rounded-xl p-3 text-xs text-fit-text outline-none focus:border-fit-primary transition-all h-20 resize-none"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-[10px] font-black text-fit-muted uppercase tracking-[0.2em] ml-1">Image de fond (URL)</label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text"
+                            defaultValue={appConfig.kick_image || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1000"}
+                            onBlur={(e) => onUpdateKickConfig({ image: e.target.value })}
+                            className="flex-1 bg-fit-surface border border-fit-border rounded-xl p-3 text-xs text-fit-text outline-none focus:border-fit-primary transition-all"
+                          />
+                          <button 
+                            onClick={() => {
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = 'image/*';
+                              input.onchange = async (e: any) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const formData = new FormData();
+                                formData.append('file', file);
+                                try {
+                                  const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                  const data = await res.json();
+                                  onUpdateKickConfig({ image: data.url });
+                                  showAlert("Image de kick mise à jour !");
+                                } catch (err) {
+                                  showAlert("Erreur lors de l'envoi.");
+                                }
+                              };
+                              input.click();
+                            }}
+                            className="px-4 bg-fit-primary/10 text-fit-primary rounded-xl hover:bg-fit-primary/20 transition-all"
+                          >
+                            <ImageIcon size={16} />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}

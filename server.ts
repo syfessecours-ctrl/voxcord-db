@@ -236,6 +236,9 @@ async function initDb() {
   await execute("INSERT INTO app_config (key, value) VALUES ('logo_url', 'https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg') ON CONFLICT (key) DO NOTHING");
   await execute("INSERT INTO app_config (key, value) VALUES ('default_ringtone', 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3') ON CONFLICT (key) DO NOTHING");
   await execute("INSERT INTO app_config (key, value) VALUES ('default_call_banner', 'https://www.dropbox.com/scl/fi/16fkgzy6fec6f96iubyxb/Kaaris-soutient-Aurier-dans-le-scandale-des-insultes.webp?rlkey=w7qb17whbbd12ttftfim5euwm&st=ju09pv3d&raw=1') ON CONFLICT (key) DO NOTHING");
+  await execute("INSERT INTO app_config (key, value) VALUES ('kick_title', 'Pause Communautaire') ON CONFLICT (key) DO NOTHING");
+  await execute("INSERT INTO app_config (key, value) VALUES ('kick_message', 'Votre accès est temporairement restreint pour permettre à l''atmosphère du salon de s''apaiser.') ON CONFLICT (key) DO NOTHING");
+  await execute("INSERT INTO app_config (key, value) VALUES ('kick_image', 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1000') ON CONFLICT (key) DO NOTHING");
 }
 
 const OWNER_USERNAME = "Vdw6200";
@@ -1010,8 +1013,19 @@ async function startServer() {
 
       const targetSocketId = Array.from(users.entries()).find(([id, u]) => u.username === targetUsername)?.[0];
       if (targetSocketId) {
-        io.to(targetSocketId).emit("login_error", `Vous avez été expulsé. Raison: ${reason}`);
-        io.sockets.sockets.get(targetSocketId)?.disconnect();
+        const kickConfig = await getAppConfig();
+        io.to(targetSocketId).emit("kicked", { 
+          reason, 
+          title: kickConfig.kick_title || "Pause Communautaire",
+          message: kickConfig.kick_message || "Votre accès est temporairement restreint.",
+          image: kickConfig.kick_image,
+          endsAt: new Date(Date.now() + 1000 * 60 * 60 * 2).toISOString() // Default 2h for now
+        });
+        
+        // Give client time to show the screen before disconnecting
+        setTimeout(() => {
+          io.sockets.sockets.get(targetSocketId)?.disconnect();
+        }, 1000);
         
         await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'kick', targetUsername, reason, new Date().toISOString()]);
       }
@@ -1401,6 +1415,18 @@ async function startServer() {
       if (!user || user.role !== 'owner') return;
 
       await execute("INSERT INTO app_config (key, value) VALUES ('default_call_banner', ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [bannerUrl]);
+      const appConfig = await getAppConfig();
+      io.emit("app_config", appConfig);
+    });
+
+    socket.on("update_kick_config", async ({ title, message, image }) => {
+      const user = users.get(socket.id);
+      if (!user || user.role !== 'owner') return;
+
+      if (title !== undefined) await execute("INSERT INTO app_config (key, value) VALUES ('kick_title', ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [title]);
+      if (message !== undefined) await execute("INSERT INTO app_config (key, value) VALUES ('kick_message', ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [message]);
+      if (image !== undefined) await execute("INSERT INTO app_config (key, value) VALUES ('kick_image', ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [image]);
+      
       const appConfig = await getAppConfig();
       io.emit("app_config", appConfig);
     });

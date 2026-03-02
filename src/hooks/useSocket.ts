@@ -81,6 +81,10 @@ export function useSocket(username: string) {
       setMe(data);
     });
 
+    newSocket.on('kicked', (data) => {
+      window.dispatchEvent(new CustomEvent('vox_kicked', { detail: data }));
+    });
+
     newSocket.on('login_error', (msg) => {
       setLoginError(msg);
       newSocket.disconnect();
@@ -423,6 +427,10 @@ export function useSocket(username: string) {
     socketRef.current?.emit('update_app_call_banner', bannerUrl);
   };
 
+  const updateKickConfig = (config: { title?: string, message?: string, image?: string }) => {
+    socketRef.current?.emit('update_kick_config', config);
+  };
+
   const sendVoiceSignal = (to: string, signal: any) => {
     socketRef.current?.emit('voice_signal', { to, signal });
   };
@@ -512,6 +520,7 @@ export function useSocket(username: string) {
     onUpdateAppLogo: updateAppLogo,
     onUpdateAppRingtone: updateAppRingtone,
     onUpdateAppCallBanner: updateAppCallBanner,
+    onUpdateKickConfig: updateKickConfig,
     onUpdateServer: updateServer,
     onResetServerIcon: resetServerIcon,
     onResetServerBanner: resetServerBanner,

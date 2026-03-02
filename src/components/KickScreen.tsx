@@ -194,21 +194,6 @@ const ImmersiveLayout: React.FC<{ config: KickConfig; timeLeft: string; progress
       animate={{ scale: 1, opacity: 1 }}
       className="relative z-10 w-full max-w-lg text-center p-8"
     >
-      <div className="relative inline-block mb-8">
-        <motion.div 
-          animate={{ scale: [1, 1.05, 1] }}
-          transition={{ duration: 4, repeat: Infinity }}
-          className="w-48 h-48 rounded-2xl overflow-hidden border-2 shadow-2xl relative z-10"
-          style={{ borderColor: config.accentColor }}
-        >
-          <img src={config.imageUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-        </motion.div>
-        <div 
-          className="absolute inset-0 blur-3xl opacity-50 z-0"
-          style={{ backgroundColor: config.accentColor }}
-        />
-      </div>
-
       <h1 className="text-4xl font-black mb-4 tracking-tighter uppercase italic">{config.title}</h1>
       <p className="text-white/70 text-lg mb-8 max-w-md mx-auto">{config.message}</p>
 
