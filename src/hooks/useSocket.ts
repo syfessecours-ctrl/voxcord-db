@@ -287,6 +287,10 @@ export function useSocket(username: string) {
     socketRef.current?.emit('mod_clear_channel', channelId);
   };
 
+  const createChannel = (serverId: string, name: string, type: 'text' | 'voice') => {
+    socketRef.current?.emit('create_channel', { serverId, name, type });
+  };
+
   const deleteServer = (serverId: string) => {
     socketRef.current?.emit('mod_delete_server', serverId);
   };
@@ -466,6 +470,7 @@ export function useSocket(username: string) {
     clearChannel,
     deleteServer,
     deleteChannel,
+    createChannel,
     joinServer,
     lockChannel,
     unlockChannel,

@@ -89,6 +89,7 @@ interface ChatInterfaceProps {
   onToggleGifs: (targetUsername: string) => void;
   onSwitchPrivateChat: (otherUser: string | null) => void;
   onCreateServer: (name: string) => void;
+  onCreateChannel: (serverId: string, name: string, type: 'text' | 'voice') => void;
   onInviteToServer: (serverId: string, targetUsername: string) => void;
   onSwitchServer: (id: string | null) => void;
   onMuteToggle: (channelId: string, isMuted: boolean) => void;
@@ -259,6 +260,7 @@ export function ChatInterface({
   onToggleGifs,
   onSwitchPrivateChat,
   onCreateServer,
+  onCreateChannel,
   onInviteToServer,
   onSwitchServer,
   onMuteToggle,
@@ -361,7 +363,12 @@ export function ChatInterface({
       ringtoneAudioRef.current.currentTime = 0;
     }
   }, [isPlayingRingtone]);
+  const [showTitleModal, setShowTitleModal] = useState(false);
+  const [titleInput, setTitleInput] = useState('');
   const [showCreateServerModal, setShowCreateServerModal] = useState(false);
+  const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
+  const [newChannelName, setNewChannelName] = useState('');
+  const [newChannelType, setNewChannelType] = useState<'text' | 'voice'>('text');
   const [newServerName, setNewServerName] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
@@ -541,13 +548,19 @@ export function ChatInterface({
   const isMod = isOwner || me?.role === 'moderator';
 
   const currentPrivateMessages = activePrivateChat ? (privateMessages[activePrivateChat] || []) : [];
+  const filteredUsers = useMemo(() => {
+    if (!activeServer) return users;
+    const memberSet = new Set(serverMembers);
+    return users.filter(u => memberSet.has(u.username));
+  }, [users, serverMembers, activeServer]);
+
   const groupedUsers = useMemo(() => {
     return {
-      owner: users.filter(u => u.role === 'owner'),
-      moderator: users.filter(u => u.role === 'moderator'),
-      user: users.filter(u => u.role === 'user'),
+      owner: filteredUsers.filter(u => u.role === 'owner'),
+      moderator: filteredUsers.filter(u => u.role === 'moderator'),
+      user: filteredUsers.filter(u => u.role === 'user'),
     };
-  }, [users]);
+  }, [filteredUsers]);
 
   const displayMessages = activePrivateChat ? currentPrivateMessages : messages;
 
@@ -1489,7 +1502,17 @@ export function ChatInterface({
             </>
           ) : (
             <div>
-              <div className="px-3 mb-2 text-[9px] font-black text-fit-muted uppercase tracking-[0.2em]">Salons</div>
+              <div className="px-3 mb-2 text-[9px] font-black text-fit-muted uppercase tracking-[0.2em] flex items-center justify-between">
+                <span>Salons</span>
+                {isOwner && (
+                  <button 
+                    onClick={() => setShowCreateChannelModal(true)}
+                    className="hover:text-fit-text transition-colors"
+                  >
+                    <Plus size={14} />
+                  </button>
+                )}
+              </div>
               <div className="space-y-0.5">
                 {channels.map(ch => (
                   <div key={ch.id} className="group relative">
@@ -1930,18 +1953,19 @@ export function ChatInterface({
                             {/* Speaking Glow Effect (Atmospheric) */}
                             <div className="absolute inset-0 bg-gradient-to-t from-fit-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
                             
-                            <div className="relative mb-8">
+                            <div className="relative mb-8 w-full flex flex-col items-center">
                               <div className={cn(
-                                "p-1.5 rounded-[3rem] transition-all duration-700 shadow-2xl overflow-hidden",
-                                "bg-gradient-to-tr from-fit-primary to-emerald-400 group-hover:scale-110 group-hover:rotate-3",
-                                "ring-8 ring-emerald-500/5 group-hover:ring-emerald-500/20"
+                                "transition-all duration-700 shadow-2xl overflow-hidden",
+                                (remoteStreamsRef.current[vu.sid] && remoteStreamsRef.current[vu.sid].getVideoTracks().length > 0) || (isMe && (isCameraOn || isScreenSharing))
+                                  ? "w-full aspect-video rounded-3xl ring-4 ring-emerald-500/20"
+                                  : "p-1.5 rounded-[3rem] bg-gradient-to-tr from-fit-primary to-emerald-400 group-hover:scale-110 group-hover:rotate-3 ring-8 ring-emerald-500/5 group-hover:ring-emerald-500/20 w-32 h-32"
                               )}>
                                 {remoteStreamsRef.current[vu.sid] && remoteStreamsRef.current[vu.sid].getVideoTracks().length > 0 ? (
-                                  <div className="w-32 h-32 rounded-[2.6rem] overflow-hidden bg-black">
+                                  <div className="w-full h-full bg-black">
                                     <RemoteVideo stream={remoteStreamsRef.current[vu.sid]} />
                                   </div>
                                 ) : isMe && (isCameraOn || isScreenSharing) && (myStreamRef.current || screenStreamRef.current) ? (
-                                  <div className="w-32 h-32 rounded-[2.6rem] overflow-hidden bg-black">
+                                  <div className="w-full h-full bg-black">
                                     <video 
                                       autoPlay 
                                       muted 
@@ -1951,9 +1975,9 @@ export function ChatInterface({
                                     />
                                   </div>
                                 ) : user?.avatar ? (
-                                  <img src={user.avatar} alt={vu.username} className="w-32 h-32 rounded-[2.6rem] object-cover bg-fit-bg" referrerPolicy="no-referrer" />
+                                  <img src={user.avatar} alt={vu.username} className="w-full h-full object-cover bg-fit-bg" referrerPolicy="no-referrer" />
                                 ) : (
-                                  <div className="w-32 h-32 bg-fit-bg rounded-[2.6rem] flex items-center justify-center text-fit-muted font-black text-5xl">
+                                  <div className="w-full h-full bg-fit-bg flex items-center justify-center text-fit-muted font-black text-5xl">
                                     {vu.username[0].toUpperCase()}
                                   </div>
                                 )}
@@ -2357,11 +2381,8 @@ export function ChatInterface({
                 {isOwner && (
                   <button 
                     onClick={() => {
-                      const title = prompt("Nouveau titre pour " + selectedUser.username, selectedUser.title || "");
-                      if (title !== null) {
-                        onSetTitle(selectedUser.username, title);
-                        setSelectedUser(null);
-                      }
+                      setTitleInput(selectedUser.title || "");
+                      setShowTitleModal(true);
                     }}
                     className="w-full flex items-center justify-between p-4 bg-fit-bg hover:bg-fit-sidebar text-fit-text rounded-2xl transition-all font-black text-xs uppercase tracking-widest group border border-fit-border"
                   >
@@ -2436,6 +2457,138 @@ export function ChatInterface({
                 >
                   Fermer
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      
+      {/* Title Change Modal */}
+      <AnimatePresence>
+        {showTitleModal && selectedUser && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="w-full max-w-sm bg-fit-surface p-8 rounded-[3rem] border border-fit-border shadow-2xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 left-0 w-full h-2 bg-fit-primary" />
+              <h3 className="text-xl font-black text-fit-text mb-6 uppercase tracking-tight">Nouveau Titre</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-fit-muted uppercase tracking-widest mb-2 ml-1">Titre pour {selectedUser.username}</label>
+                  <input 
+                    type="text"
+                    value={titleInput}
+                    onChange={(e) => setTitleInput(e.target.value)}
+                    placeholder="Ex: Légende, MVP, Staff..."
+                    className="w-full bg-fit-bg border border-fit-border rounded-2xl p-4 text-sm font-bold text-fit-text focus:outline-none focus:border-fit-primary transition-all"
+                    autoFocus
+                  />
+                </div>
+                
+                <div className="flex gap-2 pt-2">
+                  <button 
+                    onClick={() => setShowTitleModal(false)}
+                    className="flex-1 p-4 bg-fit-bg text-fit-muted rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-fit-sidebar transition-all border border-fit-border"
+                  >
+                    Annuler
+                  </button>
+                  <button 
+                    onClick={() => {
+                      onSetTitle(selectedUser.username, titleInput);
+                      setShowTitleModal(false);
+                      setSelectedUser(null);
+                    }}
+                    className="flex-1 p-4 bg-fit-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-fit-primary-hover transition-all shadow-lg shadow-fit-primary/20"
+                  >
+                    Valider
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Create Channel Modal */}
+      <AnimatePresence>
+        {showCreateChannelModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="w-full max-w-sm bg-fit-surface p-8 rounded-[3rem] border border-fit-border shadow-2xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 left-0 w-full h-2 bg-fit-primary" />
+              <h3 className="text-xl font-black text-fit-text mb-6 uppercase tracking-tight">Nouveau Salon</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-fit-muted uppercase tracking-widest mb-2 ml-1">Nom du salon</label>
+                  <input 
+                    type="text"
+                    value={newChannelName}
+                    onChange={(e) => setNewChannelName(e.target.value)}
+                    placeholder="Ex: général, gaming..."
+                    className="w-full bg-fit-bg border border-fit-border rounded-2xl p-4 text-sm font-bold text-fit-text focus:outline-none focus:border-fit-primary transition-all"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-fit-muted uppercase tracking-widest mb-2 ml-1">Type de salon</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      onClick={() => setNewChannelType('text')}
+                      className={cn(
+                        "p-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border",
+                        newChannelType === 'text' ? "bg-fit-primary text-white border-fit-primary" : "bg-fit-bg text-fit-muted border-fit-border hover:bg-fit-sidebar"
+                      )}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <Hash size={20} />
+                        <span>Texte</span>
+                      </div>
+                    </button>
+                    <button 
+                      onClick={() => setNewChannelType('voice')}
+                      className={cn(
+                        "p-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border",
+                        newChannelType === 'voice' ? "bg-fit-primary text-white border-fit-primary" : "bg-fit-bg text-fit-muted border-fit-border hover:bg-fit-sidebar"
+                      )}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <Volume2 size={20} />
+                        <span>Vocal</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="flex gap-2 pt-2">
+                  <button 
+                    onClick={() => setShowCreateChannelModal(false)}
+                    className="flex-1 p-4 bg-fit-bg text-fit-muted rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-fit-sidebar transition-all border border-fit-border"
+                  >
+                    Annuler
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (newChannelName.trim() && activeServer) {
+                        onCreateChannel(activeServer, newChannelName, newChannelType);
+                        setShowCreateChannelModal(false);
+                        setNewChannelName('');
+                      }
+                    }}
+                    className="flex-1 p-4 bg-fit-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-fit-primary-hover transition-all shadow-lg shadow-fit-primary/20"
+                  >
+                    Créer
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
@@ -3394,23 +3547,23 @@ export function ChatInterface({
                 <>
                   {/* Call Banner Background with Fade Transition */}
                   <div className="absolute inset-0 z-0 overflow-hidden">
-                    <AnimatePresence mode="wait">
-                      <motion.div
-                        key={privateCall.banner || 'global'}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 1.2, ease: "easeInOut" }}
-                        className="absolute inset-0"
-                      >
-                        <img 
-                          src={getDirectUrl(privateCall.banner || appConfig.default_call_banner || KAARIS_BANNER)} 
-                          alt="Call Banner" 
-                          className="w-full h-full object-cover scale-110 blur-[2px]" 
-                          referrerPolicy="no-referrer"
-                        />
-                      </motion.div>
-                    </AnimatePresence>
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={privateCall.banner || appConfig.default_call_banner || 'global'}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 1.2, ease: "easeInOut" }}
+                          className="absolute inset-0"
+                        >
+                          <img 
+                            src={getDirectUrl(privateCall.banner || appConfig.default_call_banner || KAARIS_BANNER)} 
+                            alt="Call Banner" 
+                            className="w-full h-full object-cover scale-110 blur-[2px]" 
+                            referrerPolicy="no-referrer"
+                          />
+                        </motion.div>
+                      </AnimatePresence>
                     <div className="absolute inset-0 bg-black/50" />
                   </div>
 

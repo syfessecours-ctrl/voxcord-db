@@ -521,6 +521,17 @@ async function startServer() {
       }
     });
 
+    socket.on("create_channel", async ({ serverId, name, type }) => {
+      const user = users.get(socket.id);
+      if (!user || user.role !== 'owner') return;
+      
+      const channelId = `ch-${Math.random().toString(36).substr(2, 9)}`;
+      await execute("INSERT INTO channels (id, name, type, server_id) VALUES (?, ?, ?, ?)", [channelId, name, type || 'text', serverId]);
+      
+      const allServers = await query("SELECT * FROM servers");
+      io.emit("server_list", allServers);
+    });
+
     socket.on("update_server", async ({ serverId, name, icon, banner }) => {
       const user = users.get(socket.id);
       if (!user) return;

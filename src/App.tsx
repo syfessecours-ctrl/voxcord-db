@@ -48,6 +48,7 @@ export default function App() {
     clearChannel,
     deleteServer,
     deleteChannel,
+    createChannel,
     joinServer,
     lockChannel,
     unlockChannel,
@@ -138,6 +139,7 @@ export default function App() {
       onSwitchPrivateChat={switchPrivateChat}
       onCreateServer={createServer}
       onInviteToServer={inviteToServer}
+      onCreateChannel={createChannel}
       onSwitchServer={switchServer}
       onMuteToggle={onMuteToggle}
       onInitPrivateCall={initPrivateCall}
