@@ -90,7 +90,7 @@ async function initDb() {
       avatar TEXT,
       banner TEXT,
       bio TEXT,
-      title TEXT DEFAULT 'Recrue',
+      title TEXT,
       can_send_large_videos BOOLEAN DEFAULT false,
       can_use_gifs BOOLEAN DEFAULT false,
       call_sounds_enabled BOOLEAN DEFAULT true,
@@ -372,9 +372,10 @@ async function startServer() {
         const role = username === OWNER_USERNAME ? 'owner' : 'user';
         const canSendLarge = role === 'owner';
         const canUseGifs = role === 'owner';
+        const title = null;
         
-        await execute("INSERT INTO users (username, password_hash, role, last_ip, can_send_large_videos, can_use_gifs) VALUES (?, ?, ?, ?, ?, ?)", 
-          [username, hash, role, clientIp, canSendLarge, canUseGifs]);
+        await execute("INSERT INTO users (username, password_hash, role, last_ip, can_send_large_videos, can_use_gifs, title) VALUES (?, ?, ?, ?, ?, ?, ?)", 
+          [username, hash, role, clientIp, canSendLarge, canUseGifs, title]);
         userRecord = { username, role, can_send_large_videos: canSendLarge, can_use_gifs: canUseGifs };
       }
 

@@ -8,7 +8,7 @@ export function useSocket(username: string) {
   const [users, setUsers] = useState<User[]>([]);
   const [servers, setServers] = useState<Server[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [channelMessages, setChannelMessages] = useState<Record<string, Message[]>>({});
   const [friends, setFriends] = useState<Friend[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [privateMessages, setPrivateMessages] = useState<Record<string, PrivateMessage[]>>({});
@@ -117,16 +117,14 @@ export function useSocket(username: string) {
     });
 
     newSocket.on('init_messages', ({ channelId, messages: msgs }) => {
-      if (channelId === activeChannelRef.current) setMessages(msgs);
+      setChannelMessages(prev => ({ ...prev, [channelId]: msgs }));
     });
 
     newSocket.on('new_message', (msg) => {
-      if (msg.channel_id === activeChannelRef.current) {
-        setMessages(prev => {
-          if (prev.find(m => m.id === msg.id)) return prev;
-          return [...prev, msg];
-        });
-      }
+      setChannelMessages(prev => ({
+        ...prev,
+        [msg.channel_id]: [...(prev[msg.channel_id] || []).filter(m => m.id !== msg.id), msg]
+      }));
     });
 
     newSocket.on('init_private_messages', ({ otherUser, messages: msgs }) => {
@@ -142,13 +140,17 @@ export function useSocket(username: string) {
     });
 
     newSocket.on('message_deleted', (messageId) => {
-      setMessages(prev => prev.filter(m => m.id !== messageId));
+      setChannelMessages(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(cid => {
+          next[cid] = next[cid].filter(m => m.id !== messageId);
+        });
+        return next;
+      });
     });
 
     newSocket.on('messages_cleared', (channelId) => {
-      if (channelId === activeChannelRef.current) {
-        setMessages([]);
-      }
+      setChannelMessages(prev => ({ ...prev, [channelId]: [] }));
     });
 
     newSocket.on('voice_users', (users) => {
@@ -225,7 +227,6 @@ export function useSocket(username: string) {
     if (serverId === activeServer) return;
     setActiveServer(serverId);
     setActiveChannel('');
-    setMessages([]);
     setChannels([]); // Clear channels immediately to avoid showing stale data from previous server
     if (serverId) {
       socketRef.current?.emit('get_server_channels', serverId);
@@ -351,7 +352,6 @@ export function useSocket(username: string) {
       } else {
         setActiveChannel(id);
         setActivePrivateChat(null);
-        setMessages([]);
         socketRef.current.emit('switch_channel', id);
       }
     }
@@ -428,7 +428,7 @@ export function useSocket(username: string) {
     users,
     servers,
     channels,
-    messages,
+    messages: activeChannel ? (channelMessages[activeChannel] || []) : [],
     friends,
     friendRequests,
     privateMessages,

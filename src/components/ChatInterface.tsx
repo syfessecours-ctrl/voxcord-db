@@ -198,7 +198,7 @@ function CallsignBanner({ user, className, size = 'md' }: { user: User | any, cl
             "font-bold text-white/80 uppercase tracking-widest leading-none mt-0.5 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)] italic",
             isSmall ? "text-[6px]" : isLarge ? "text-[10px]" : "text-[8px]"
           )}>
-            {user.title || (user.role === 'owner' ? 'Légende' : user.role === 'moderator' ? 'Vétéran' : 'Recrue')}
+            {user.title || (user.role === 'owner' ? 'Légende' : user.role === 'moderator' ? 'Vétéran' : '')}
           </div>
         </div>
       </div>
