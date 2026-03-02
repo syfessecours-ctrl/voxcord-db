@@ -1,6 +1,6 @@
 {
-  "name": "Remix: Remix: FitCord",
-  "description": "Une application de communication en temps réel axée sur le fitness, inspirée de Discord.",
+  "name": "FitCord",
+  "description": "A professional fitness community platform inspired by Discord, featuring real-time chat, voice channels, and private calls.",
   "requestFramePermissions": [
     "camera",
     "microphone"

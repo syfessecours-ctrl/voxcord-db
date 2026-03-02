@@ -34,6 +34,7 @@ export default function App() {
     updateStatus,
     onUpdateProfile,
     onUpdateAppLogo,
+    onUpdateAppRingtone,
     onUpdateServer,
     onResetServerIcon,
     onResetServerBanner,
@@ -124,6 +125,7 @@ export default function App() {
       onUpdateStatus={updateStatus}
       onUpdateProfile={onUpdateProfile}
       onUpdateAppLogo={onUpdateAppLogo}
+      onUpdateAppRingtone={onUpdateAppRingtone}
       onUpdateServer={onUpdateServer}
       onResetServerIcon={onResetServerIcon}
       onResetServerBanner={onResetServerBanner}

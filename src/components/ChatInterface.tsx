@@ -78,6 +78,7 @@ interface ChatInterfaceProps {
   onUpdateStatus: (status: 'online' | 'away') => void;
   onUpdateProfile: (profile: { displayName?: string, avatar?: string, banner?: string, bio?: string }) => void;
   onUpdateAppLogo: (logoUrl: string) => void;
+  onUpdateAppRingtone: (ringtoneUrl: string) => void;
   onUpdateServer: (serverId: string, name: string, icon: string, banner: string) => void;
   onResetServerIcon: (serverId: string) => void;
   onResetServerBanner: (serverId: string) => void;
@@ -134,7 +135,7 @@ const getDirectUrl = (url: string) => {
 };
 
 const KAARIS_BANNER = "https://www.dropbox.com/scl/fi/16fkgzy6fec6f96iubyxb/Kaaris-soutient-Aurier-dans-le-scandale-des-insultes.webp?rlkey=w7qb17whbbd12ttftfim5euwm&st=ju09pv3d&raw=1";
-const DEFAULT_RINGTONE_URL = "/src/SonnerieK.MP3";
+const DEFAULT_RINGTONE_URL = "";
 
 export function ChatInterface({
   username,
@@ -176,6 +177,7 @@ export function ChatInterface({
   onUpdateStatus,
   onUpdateProfile,
   onUpdateAppLogo,
+  onUpdateAppRingtone,
   onUpdateServer,
   onResetServerIcon,
   onResetServerBanner,
@@ -408,10 +410,10 @@ export function ChatInterface({
   }, [me]);
 
   useEffect(() => {
-    if (activeChannel === 'anime-zone' && lastAnimatedChannel !== 'anime-zone') {
+    if (activeChannel === 'fit-zone' && lastAnimatedChannel !== 'fit-zone') {
       setShowAnimeAnimation(true);
-      setLastAnimatedChannel('anime-zone');
-    } else if (activeChannel !== 'anime-zone') {
+      setLastAnimatedChannel('fit-zone');
+    } else if (activeChannel !== 'fit-zone') {
       setLastAnimatedChannel(activeChannel);
     }
   }, [activeChannel, lastAnimatedChannel]);
@@ -2529,6 +2531,38 @@ export function ChatInterface({
                       >
                         {isRingtoneUploading ? "Envoi..." : me?.ringtoneUrl ? "Changer Sonnerie" : "Choisir MP3"}
                       </button>
+                      {isOwner && (
+                        <button 
+                          onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'audio/mpeg,audio/mp3';
+                            input.onchange = async (e: any) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setIsRingtoneUploading(true);
+                              const formData = new FormData();
+                              formData.append('file', file);
+                              try {
+                                const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                const data = await res.json();
+                                onUpdateAppRingtone(data.url);
+                                showAlert("Sonnerie globale mise à jour !");
+                              } catch (err) {
+                                showAlert("Erreur lors de l'envoi.");
+                              } finally {
+                                setIsRingtoneUploading(false);
+                              }
+                            };
+                            input.click();
+                          }}
+                          disabled={isRingtoneUploading}
+                          className="px-4 py-3 bg-fit-primary/20 text-fit-primary rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-fit-primary/30 transition-all disabled:opacity-50"
+                          title="Définir comme sonnerie par défaut pour tous"
+                        >
+                          DÉFINIR GLOBAL
+                        </button>
+                      )}
                       <input 
                         type="file" 
                         ref={ringtoneInputRef} 

@@ -81,7 +81,7 @@ export function AnimeEntryAnimation({ onComplete }: { onComplete: () => void }) 
             className="relative z-20"
           >
             <h1 className="text-6xl font-black text-white italic tracking-tighter uppercase drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]">
-              Anime <span className="text-red-600">Zone</span>
+              Fit<span className="text-fit-primary">Cord</span>
             </h1>
             <motion.div 
               animate={{ x: [-2, 2, -2] }}

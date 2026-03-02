@@ -377,6 +377,10 @@ export function useSocket(username: string) {
     socketRef.current?.emit('update_app_logo', logoUrl);
   };
 
+  const updateAppRingtone = (ringtoneUrl: string) => {
+    socketRef.current?.emit('update_app_ringtone', ringtoneUrl);
+  };
+
   const sendVoiceSignal = (to: string, signal: any) => {
     socketRef.current?.emit('voice_signal', { to, signal });
   };
@@ -440,6 +444,7 @@ export function useSocket(username: string) {
     updateStatus,
     onUpdateProfile: updateProfile,
     onUpdateAppLogo: updateAppLogo,
+    onUpdateAppRingtone: updateAppRingtone,
     onUpdateServer: updateServer,
     onResetServerIcon: resetServerIcon,
     onResetServerBanner: resetServerBanner,

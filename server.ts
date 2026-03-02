@@ -226,9 +226,9 @@ async function initDb() {
   }
 
   await execute("INSERT INTO servers (id, name, owner, timestamp) VALUES ('fitcord-global', 'FitCord Global', 'system', '2026-02-27T00:00:00.000Z') ON CONFLICT DO NOTHING");
-  await execute("INSERT INTO channels (id, name, type, server_id, description) VALUES ('anime-zone', 'anime-zone', 'text', 'fitcord-global', 'Entrée stylée garantie !') ON CONFLICT DO NOTHING");
+  await execute("INSERT INTO channels (id, name, type, server_id, description) VALUES ('fit-zone', 'fit-zone', 'text', 'fitcord-global', 'Entrée stylée garantie !') ON CONFLICT DO NOTHING");
   await execute("INSERT INTO channels (id, name, type, server_id) VALUES ('general', 'général', 'text', 'fitcord-global') ON CONFLICT DO NOTHING");
-  await execute("INSERT INTO app_config (key, value) VALUES ('logo_url', 'https://picsum.photos/seed/fitcord/200/200') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
+  await execute("INSERT INTO app_config (key, value) VALUES ('logo_url', 'https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
   await execute("INSERT INTO app_config (key, value) VALUES ('default_ringtone', '/src/SonnerieK.MP3') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
   await execute("INSERT INTO app_config (key, value) VALUES ('default_call_banner', 'https://www.dropbox.com/scl/fi/16fkgzy6fec6f96iubyxb/Kaaris-soutient-Aurier-dans-le-scandale-des-insultes.webp?rlkey=w7qb17whbbd12ttftfim5euwm&st=ju09pv3d&raw=1') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
 }
@@ -1230,6 +1230,15 @@ async function startServer() {
       if (!user || user.role !== 'owner') return;
 
       await execute("INSERT INTO app_config (key, value) VALUES ('logo_url', ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [logoUrl]);
+      const appConfig = await getAppConfig();
+      io.emit("app_config", appConfig);
+    });
+
+    socket.on("update_app_ringtone", async (ringtoneUrl) => {
+      const user = users.get(socket.id);
+      if (!user || user.role !== 'owner') return;
+
+      await execute("INSERT INTO app_config (key, value) VALUES ('default_ringtone', ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [ringtoneUrl]);
       const appConfig = await getAppConfig();
       io.emit("app_config", appConfig);
     });
