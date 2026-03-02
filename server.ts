@@ -229,7 +229,7 @@ async function initDb() {
   await execute("INSERT INTO channels (id, name, type, server_id, description) VALUES ('fit-zone', 'fit-zone', 'text', 'fitcord-global', 'Entrée stylée garantie !') ON CONFLICT DO NOTHING");
   await execute("INSERT INTO channels (id, name, type, server_id) VALUES ('general', 'général', 'text', 'fitcord-global') ON CONFLICT DO NOTHING");
   await execute("INSERT INTO app_config (key, value) VALUES ('logo_url', 'https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
-  await execute("INSERT INTO app_config (key, value) VALUES ('default_ringtone', '/src/SonnerieK.MP3') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
+  await execute("INSERT INTO app_config (key, value) VALUES ('default_ringtone', 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
   await execute("INSERT INTO app_config (key, value) VALUES ('default_call_banner', 'https://www.dropbox.com/scl/fi/16fkgzy6fec6f96iubyxb/Kaaris-soutient-Aurier-dans-le-scandale-des-insultes.webp?rlkey=w7qb17whbbd12ttftfim5euwm&st=ju09pv3d&raw=1') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
 }
 

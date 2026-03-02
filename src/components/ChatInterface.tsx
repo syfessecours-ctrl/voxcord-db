@@ -136,7 +136,7 @@ const getDirectUrl = (url: string) => {
 };
 
 const KAARIS_BANNER = "https://www.dropbox.com/scl/fi/16fkgzy6fec6f96iubyxb/Kaaris-soutient-Aurier-dans-le-scandale-des-insultes.webp?rlkey=w7qb17whbbd12ttftfim5euwm&st=ju09pv3d&raw=1";
-const DEFAULT_RINGTONE_URL = "";
+const DEFAULT_RINGTONE_URL = "https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3";
 
 export function ChatInterface({
   username,
@@ -738,11 +738,6 @@ export function ChatInterface({
       // Toujours tenter de jouer la sonnerie, sauf si explicitement désactivé
       if (me?.callSoundsEnabled !== false) {
         console.log("[Audio] Triggering incoming ringtone");
-        // Force audio context activation
-        const audio = new Audio();
-        audio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
-        audio.play().catch((err) => console.warn("[Audio] Autoplay blocked:", err));
-        
         setIsPlayingRingtone(true);
       }
     };
@@ -830,9 +825,8 @@ export function ChatInterface({
       window.removeEventListener('vox_private_call_rejected' as any, handleRejected);
       window.removeEventListener('vox_private_call_ended' as any, handleEnded);
       window.removeEventListener('vox_private_call_signal' as any, handleSignal);
-      setIsPlayingRingtone(false);
     };
-  }, [privateCall, me]);
+  }, [privateCall.status, me?.username, me?.callSoundsEnabled]);
 
   const cleanupPrivateCall = () => {
     setIsPlayingRingtone(false);
@@ -878,11 +872,6 @@ export function ChatInterface({
         // Toujours tenter de jouer la sonnerie, sauf si explicitement désactivé
         if (me?.callSoundsEnabled !== false) {
           console.log("[Audio] Triggering outgoing ringtone");
-          // Force audio context activation
-          const audio = new Audio();
-          audio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
-          audio.play().catch((err) => console.warn("[Audio] Autoplay blocked:", err));
-          
           setIsPlayingRingtone(true);
         }
         onInitPrivateCall(targetUsername, id);
