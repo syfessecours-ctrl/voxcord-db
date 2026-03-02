@@ -24,6 +24,7 @@ import {
   MessageSquare,
   ArrowLeft,
   Volume2,
+  Globe,
   Mic,
   MicOff,
   PhoneOff,
@@ -337,6 +338,7 @@ export function ChatInterface({
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'general' | 'global' | 'kick'>('general');
   const [echoCancellation, setEchoCancellation] = useState(true);
   const [noiseSuppression, setNoiseSuppression] = useState(true);
   const [isRingtoneUploading, setIsRingtoneUploading] = useState(false);
@@ -2690,89 +2692,188 @@ export function ChatInterface({
       {/* Settings Modal */}
       <AnimatePresence>
         {showSettingsModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] flex items-center justify-center p-4">
             <motion.div 
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 40 }}
-              className="w-full max-w-md bg-fit-surface p-10 rounded-[3rem] border border-fit-border shadow-2xl relative overflow-hidden"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="w-full max-w-4xl h-[80vh] bg-fit-surface rounded-[3rem] border border-fit-border shadow-2xl flex overflow-hidden"
             >
-              <div className="absolute top-0 left-0 w-full h-2 bg-fit-primary" />
-              
-              <div className="mb-10">
-                <h2 className="text-3xl font-black text-fit-text tracking-tighter mb-2">Paramètres</h2>
-                <p className="text-fit-muted text-sm font-bold uppercase tracking-widest opacity-60">Audio & Expérience</p>
+              {/* Sidebar */}
+              <div className="w-64 bg-fit-bg border-r border-fit-border p-8 flex flex-col">
+                <div className="mb-10">
+                  <h2 className="text-2xl font-black text-fit-text tracking-tighter">Paramètres</h2>
+                  <p className="text-[10px] text-fit-muted font-black uppercase tracking-widest opacity-50">Configuration</p>
+                </div>
+
+                <div className="space-y-2 flex-1">
+                  <button 
+                    onClick={() => setActiveSettingsTab('general')}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all",
+                      activeSettingsTab === 'general' ? "bg-fit-primary text-white shadow-lg shadow-fit-primary/20" : "text-fit-muted hover:bg-fit-surface hover:text-fit-text"
+                    )}
+                  >
+                    <Volume2 size={18} />
+                    Général
+                  </button>
+
+                  {isOwner && (
+                    <>
+                      <button 
+                        onClick={() => setActiveSettingsTab('global')}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all",
+                          activeSettingsTab === 'global' ? "bg-fit-primary text-white shadow-lg shadow-fit-primary/20" : "text-fit-muted hover:bg-fit-surface hover:text-fit-text"
+                        )}
+                      >
+                        <Globe size={18} />
+                        Global
+                      </button>
+                      <button 
+                        onClick={() => setActiveSettingsTab('kick')}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all",
+                          activeSettingsTab === 'kick' ? "bg-fit-primary text-white shadow-lg shadow-fit-primary/20" : "text-fit-muted hover:bg-fit-surface hover:text-fit-text"
+                        )}
+                      >
+                        <UserX size={18} />
+                        Kick Screen
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                <button 
+                  onClick={() => setShowSettingsModal(false)}
+                  className="w-full py-4 bg-fit-surface border border-fit-border text-fit-text rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-fit-bg transition-all shadow-sm"
+                >
+                  Fermer
+                </button>
               </div>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-6 bg-fit-bg rounded-[2rem] border border-fit-border group hover:border-fit-primary/30 transition-all">
-                  <div>
-                    <div className="text-sm font-black text-fit-text mb-1">Annulation d'écho</div>
-                    <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Echo Cancellation</div>
-                  </div>
-                  <button 
-                    onClick={() => setEchoCancellation(!echoCancellation)}
-                    className={cn(
-                      "w-14 h-8 rounded-full transition-all relative p-1",
-                      echoCancellation ? "bg-fit-primary" : "bg-fit-sidebar"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-6 h-6 bg-white rounded-full transition-all shadow-md",
-                      echoCancellation ? "translate-x-6" : "translate-x-0"
-                    )} />
-                  </button>
-                </div>
 
-                <div className="flex items-center justify-between p-6 bg-fit-bg rounded-[2rem] border border-fit-border group hover:border-fit-primary/30 transition-all">
-                  <div>
-                    <div className="text-sm font-black text-fit-text mb-1">Suppression du bruit</div>
-                    <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Noise Suppression</div>
-                  </div>
-                  <button 
-                    onClick={() => setNoiseSuppression(!noiseSuppression)}
-                    className={cn(
-                      "w-14 h-8 rounded-full transition-all relative p-1",
-                      noiseSuppression ? "bg-fit-primary" : "bg-fit-sidebar"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-6 h-6 bg-white rounded-full transition-all shadow-md",
-                      noiseSuppression ? "translate-x-6" : "translate-x-0"
-                    )} />
-                  </button>
-                </div>
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-12 bg-fit-surface custom-scrollbar">
+                {activeSettingsTab === 'general' && (
+                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div>
+                      <h3 className="text-xl font-black text-fit-text mb-1 uppercase italic tracking-tighter">Audio & Expérience</h3>
+                      <p className="text-xs text-fit-muted font-bold opacity-60">Gérez vos préférences personnelles</p>
+                    </div>
 
-                <div className="flex items-center justify-between p-6 bg-fit-bg rounded-[2rem] border border-fit-border group hover:border-fit-primary/30 transition-all">
-                  <div>
-                    <div className="text-sm font-black text-fit-text mb-1">Sons d'appel</div>
-                    <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Call Sounds</div>
-                  </div>
-                  <button 
-                    onClick={() => onUpdateCallSettings(!(me?.callSoundsEnabled !== false))}
-                    className={cn(
-                      "w-14 h-8 rounded-full transition-all relative p-1",
-                      (me?.callSoundsEnabled !== false) ? "bg-fit-primary" : "bg-fit-sidebar"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-6 h-6 bg-white rounded-full transition-all shadow-md",
-                      (me?.callSoundsEnabled !== false) ? "translate-x-6" : "translate-x-0"
-                    )} />
-                  </button>
-                </div>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className="flex items-center justify-between p-6 bg-fit-bg rounded-3xl border border-fit-border group hover:border-fit-primary/30 transition-all">
+                        <div>
+                          <div className="text-sm font-black text-fit-text mb-1">Annulation d'écho</div>
+                          <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Echo Cancellation</div>
+                        </div>
+                        <button 
+                          onClick={() => setEchoCancellation(!echoCancellation)}
+                          className={cn(
+                            "w-14 h-8 rounded-full transition-all relative p-1",
+                            echoCancellation ? "bg-fit-primary" : "bg-fit-sidebar"
+                          )}
+                        >
+                          <div className={cn(
+                            "w-6 h-6 bg-white rounded-full transition-all shadow-md",
+                            echoCancellation ? "translate-x-6" : "translate-x-0"
+                          )} />
+                        </button>
+                      </div>
 
-                {isOwner && (
-                  <div className="p-6 bg-fit-bg rounded-[2rem] border border-fit-border">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <div className="text-sm font-black text-fit-text mb-1">Sonnerie Globale</div>
-                        <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Global Ringtone</div>
+                      <div className="flex items-center justify-between p-6 bg-fit-bg rounded-3xl border border-fit-border group hover:border-fit-primary/30 transition-all">
+                        <div>
+                          <div className="text-sm font-black text-fit-text mb-1">Suppression du bruit</div>
+                          <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Noise Suppression</div>
+                        </div>
+                        <button 
+                          onClick={() => setNoiseSuppression(!noiseSuppression)}
+                          className={cn(
+                            "w-14 h-8 rounded-full transition-all relative p-1",
+                            noiseSuppression ? "bg-fit-primary" : "bg-fit-sidebar"
+                          )}
+                        >
+                          <div className={cn(
+                            "w-6 h-6 bg-white rounded-full transition-all shadow-md",
+                            noiseSuppression ? "translate-x-6" : "translate-x-0"
+                          )} />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between p-6 bg-fit-bg rounded-3xl border border-fit-border group hover:border-fit-primary/30 transition-all">
+                        <div>
+                          <div className="text-sm font-black text-fit-text mb-1">Sons d'appel</div>
+                          <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Call Sounds</div>
+                        </div>
+                        <button 
+                          onClick={() => onUpdateCallSettings(!(me?.callSoundsEnabled !== false))}
+                          className={cn(
+                            "w-14 h-8 rounded-full transition-all relative p-1",
+                            (me?.callSoundsEnabled !== false) ? "bg-fit-primary" : "bg-fit-sidebar"
+                          )}
+                        >
+                          <div className={cn(
+                            "w-6 h-6 bg-white rounded-full transition-all shadow-md",
+                            (me?.callSoundsEnabled !== false) ? "translate-x-6" : "translate-x-0"
+                          )} />
+                        </button>
                       </div>
                     </div>
-                    
-                    <div className="flex flex-col gap-2">
-                      <div className="flex gap-2">
+
+                    <div className="p-6 bg-amber-500/10 border border-amber-500/20 rounded-3xl flex gap-4">
+                      <ShieldAlert size={24} className="text-amber-500 flex-shrink-0" />
+                      <p className="text-[10px] text-amber-500 font-black uppercase tracking-widest leading-relaxed">
+                        Les changements prendront effet lors de votre prochaine connexion vocale.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {activeSettingsTab === 'global' && isOwner && (
+                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div>
+                      <h3 className="text-xl font-black text-fit-text mb-1 uppercase italic tracking-tighter">Configuration Globale</h3>
+                      <p className="text-xs text-fit-muted font-bold opacity-60">Personnalisez l'expérience pour tous les membres</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6">
+                      {/* Logo Section */}
+                      <div className="p-8 bg-fit-bg rounded-[2.5rem] border border-fit-border">
+                        <div className="flex items-center justify-between mb-8">
+                          <div>
+                            <div className="text-sm font-black text-fit-text mb-1">Logo FitCord</div>
+                            <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Custom Branding</div>
+                          </div>
+                          <div className="w-16 h-16 bg-fit-surface rounded-2xl overflow-hidden border border-fit-border shadow-inner">
+                            <img 
+                              src={appConfig.logo_url || "https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg"} 
+                              alt="Logo" 
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = "https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg";
+                              }}
+                            />
+                          </div>
+                        </div>
+                        
+                        <button 
+                          onClick={() => logoInputRef.current?.click()}
+                          disabled={isLogoUploading}
+                          className="w-full py-4 bg-fit-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-fit-primary-hover transition-all disabled:opacity-50 shadow-lg shadow-fit-primary/20"
+                        >
+                          {isLogoUploading ? `Envoi ${logoUploadProgress}%` : "Changer le Logo"}
+                        </button>
+                        <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={handleLogoUpload} />
+                      </div>
+
+                      {/* Audio Section */}
+                      <div className="p-8 bg-fit-bg rounded-[2.5rem] border border-fit-border">
+                        <div className="mb-6">
+                          <div className="text-sm font-black text-fit-text mb-1">Sonnerie Globale</div>
+                          <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Global Ringtone</div>
+                        </div>
+                        
                         <button 
                           onClick={() => {
                             const input = document.createElement('input');
@@ -2798,166 +2899,120 @@ export function ChatInterface({
                             input.click();
                           }}
                           disabled={isRingtoneUploading}
-                          className="flex-1 py-3 bg-fit-primary/20 text-fit-primary rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-fit-primary/30 transition-all disabled:opacity-50"
+                          className="w-full py-4 bg-fit-surface border border-fit-border text-fit-text rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-fit-bg hover:border-fit-primary/30 transition-all disabled:opacity-50"
                         >
-                          {isRingtoneUploading ? "Envoi..." : "Changer Sonnerie Globale"}
+                          {isRingtoneUploading ? "Envoi..." : "Changer la Sonnerie Globale"}
                         </button>
                       </div>
-                    </div>
 
-                    <div className="mt-4 space-y-2">
-                      <label className="block text-[10px] font-black text-fit-muted uppercase tracking-[0.2em] ml-1">Image d'appel globale (60%)</label>
-                      <button 
-                        onClick={() => {
-                          const input = document.createElement('input');
-                          input.type = 'file';
-                          input.accept = 'image/*';
-                          input.onchange = async (e: any) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            setIsUploading(true);
-                            const formData = new FormData();
-                            formData.append('file', file);
-                            try {
-                              const res = await fetch('/api/upload', { method: 'POST', body: formData });
-                              const data = await res.json();
-                              onUpdateAppCallBanner(data.url);
-                              showAlert("Image d'appel globale mise à jour !");
-                            } catch (err) {
-                              showAlert("Erreur lors de l'envoi.");
-                            } finally {
-                              setIsUploading(false);
-                            }
-                          };
-                          input.click();
-                        }}
-                        className="w-full py-3 bg-fit-primary/10 text-fit-primary border border-fit-primary/20 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-fit-primary/20 transition-all"
-                      >
-                        Changer l'image globale d'appel
-                      </button>
+                      {/* Call Banner Section */}
+                      <div className="p-8 bg-fit-bg rounded-[2.5rem] border border-fit-border">
+                        <div className="mb-6">
+                          <div className="text-sm font-black text-fit-text mb-1">Image d'appel globale</div>
+                          <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Call Background</div>
+                        </div>
+                        
+                        <button 
+                          onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'image/*';
+                            input.onchange = async (e: any) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setIsUploading(true);
+                              const formData = new FormData();
+                              formData.append('file', file);
+                              try {
+                                const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                const data = await res.json();
+                                onUpdateAppCallBanner(data.url);
+                                showAlert("Image d'appel globale mise à jour !");
+                              } catch (err) {
+                                showAlert("Erreur lors de l'envoi.");
+                              } finally {
+                                setIsUploading(false);
+                              }
+                            };
+                            input.click();
+                          }}
+                          className="w-full py-4 bg-fit-surface border border-fit-border text-fit-text rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-fit-bg hover:border-fit-primary/30 transition-all"
+                        >
+                          Changer l'image globale d'appel
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {isOwner && (
-                  <div className="p-6 bg-fit-bg rounded-[2rem] border border-fit-border">
-                    <div className="mb-6">
-                      <div className="text-sm font-black text-fit-text mb-1">Configuration Écran de Kick</div>
-                      <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Kick Screen Customization</div>
+                {activeSettingsTab === 'kick' && isOwner && (
+                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div>
+                      <h3 className="text-xl font-black text-fit-text mb-1 uppercase italic tracking-tighter">Configuration Écran de Kick</h3>
+                      <p className="text-xs text-fit-muted font-bold opacity-60">Personnalisez l'écran d'exclusion</p>
                     </div>
 
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="block text-[10px] font-black text-fit-muted uppercase tracking-[0.2em] ml-1">Titre de l'écran</label>
-                        <input 
-                          type="text"
-                          defaultValue={appConfig.kick_title || "Pause Communautaire"}
-                          onBlur={(e) => onUpdateKickConfig({ title: e.target.value })}
-                          className="w-full bg-fit-surface border border-fit-border rounded-xl p-3 text-xs text-fit-text outline-none focus:border-fit-primary transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="block text-[10px] font-black text-fit-muted uppercase tracking-[0.2em] ml-1">Message d'exclusion</label>
-                        <textarea 
-                          defaultValue={appConfig.kick_message || "Votre accès est temporairement restreint pour permettre à l'atmosphère du salon de s'apaiser."}
-                          onBlur={(e) => onUpdateKickConfig({ message: e.target.value })}
-                          className="w-full bg-fit-surface border border-fit-border rounded-xl p-3 text-xs text-fit-text outline-none focus:border-fit-primary transition-all h-20 resize-none"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="block text-[10px] font-black text-fit-muted uppercase tracking-[0.2em] ml-1">Image de fond (URL)</label>
-                        <div className="flex gap-2">
+                    <div className="space-y-6">
+                      <div className="p-8 bg-fit-bg rounded-[2.5rem] border border-fit-border space-y-6">
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black text-fit-muted uppercase tracking-[0.2em] ml-1">Titre de l'écran</label>
                           <input 
                             type="text"
-                            defaultValue={appConfig.kick_image || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1000"}
-                            onBlur={(e) => onUpdateKickConfig({ image: e.target.value })}
-                            className="flex-1 bg-fit-surface border border-fit-border rounded-xl p-3 text-xs text-fit-text outline-none focus:border-fit-primary transition-all"
+                            defaultValue={appConfig.kick_title || "Pause Communautaire"}
+                            onBlur={(e) => onUpdateKickConfig({ title: e.target.value })}
+                            className="w-full bg-fit-surface border border-fit-border rounded-2xl p-4 text-xs text-fit-text outline-none focus:border-fit-primary transition-all shadow-inner"
                           />
-                          <button 
-                            onClick={() => {
-                              const input = document.createElement('input');
-                              input.type = 'file';
-                              input.accept = 'image/*';
-                              input.onchange = async (e: any) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                const formData = new FormData();
-                                formData.append('file', file);
-                                try {
-                                  const res = await fetch('/api/upload', { method: 'POST', body: formData });
-                                  const data = await res.json();
-                                  onUpdateKickConfig({ image: data.url });
-                                  showAlert("Image de kick mise à jour !");
-                                } catch (err) {
-                                  showAlert("Erreur lors de l'envoi.");
-                                }
-                              };
-                              input.click();
-                            }}
-                            className="px-4 bg-fit-primary/10 text-fit-primary rounded-xl hover:bg-fit-primary/20 transition-all"
-                          >
-                            <ImageIcon size={16} />
-                          </button>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black text-fit-muted uppercase tracking-[0.2em] ml-1">Message d'exclusion</label>
+                          <textarea 
+                            defaultValue={appConfig.kick_message || "Votre accès est temporairement restreint pour permettre à l'atmosphère du salon de s'apaiser."}
+                            onBlur={(e) => onUpdateKickConfig({ message: e.target.value })}
+                            className="w-full bg-fit-surface border border-fit-border rounded-2xl p-4 text-xs text-fit-text outline-none focus:border-fit-primary transition-all h-32 resize-none shadow-inner"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black text-fit-muted uppercase tracking-[0.2em] ml-1">Image de fond (URL ou Upload)</label>
+                          <div className="flex gap-3">
+                            <input 
+                              type="text"
+                              defaultValue={appConfig.kick_image || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1000"}
+                              onBlur={(e) => onUpdateKickConfig({ image: e.target.value })}
+                              className="flex-1 bg-fit-surface border border-fit-border rounded-2xl p-4 text-xs text-fit-text outline-none focus:border-fit-primary transition-all shadow-inner"
+                            />
+                            <button 
+                              onClick={() => {
+                                const input = document.createElement('input');
+                                input.type = 'file';
+                                input.accept = 'image/*';
+                                input.onchange = async (e: any) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  const formData = new FormData();
+                                  formData.append('file', file);
+                                  try {
+                                    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                    const data = await res.json();
+                                    onUpdateKickConfig({ image: data.url });
+                                    showAlert("Image de kick mise à jour !");
+                                  } catch (err) {
+                                    showAlert("Erreur lors de l'envoi.");
+                                  }
+                                };
+                                input.click();
+                              }}
+                              className="w-14 h-14 bg-fit-primary text-white rounded-2xl flex items-center justify-center hover:bg-fit-primary-hover transition-all shadow-lg shadow-fit-primary/20"
+                            >
+                              <ImageIcon size={20} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 )}
-
-                <div className="p-6 bg-amber-500/10 border border-amber-500/20 rounded-[2rem] flex gap-4">
-                  <ShieldAlert size={24} className="text-amber-500 flex-shrink-0" />
-                  <p className="text-[10px] text-amber-500 font-black uppercase tracking-widest leading-relaxed">
-                    Les changements prendront effet lors de votre prochaine connexion vocale.
-                  </p>
-                </div>
-
-                {isOwner && (
-                  <div className="p-6 bg-fit-bg rounded-[2rem] border border-fit-border">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <div className="text-sm font-black text-fit-text mb-1">Logo FitCord</div>
-                        <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Custom Branding</div>
-                      </div>
-                      <div className="w-12 h-12 bg-fit-surface rounded-xl overflow-hidden border border-fit-border">
-                        <img 
-                          src={appConfig.logo_url || "https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg"} 
-                          alt="Logo" 
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = "https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg";
-                          }}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => logoInputRef.current?.click()}
-                        disabled={isLogoUploading}
-                        className="flex-1 py-3 bg-fit-primary/10 text-fit-primary rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-fit-primary hover:text-white transition-all disabled:opacity-50"
-                      >
-                        {isLogoUploading ? `Envoi ${logoUploadProgress}%` : "Changer Logo"}
-                      </button>
-                      <input 
-                        type="file" 
-                        ref={logoInputRef} 
-                        className="hidden" 
-                        accept="image/*" 
-                        onChange={handleLogoUpload} 
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <button 
-                  onClick={() => setShowSettingsModal(false)}
-                  className="w-full py-5 px-4 bg-fit-primary text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-fit-primary-hover transition-all mt-6 shadow-lg shadow-fit-primary/20"
-                >
-                  Enregistrer & Fermer
-                </button>
               </div>
             </motion.div>
           </div>
