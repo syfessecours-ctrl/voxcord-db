@@ -13,6 +13,7 @@ export function useSocket(username: string) {
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [privateMessages, setPrivateMessages] = useState<Record<string, PrivateMessage[]>>({});
   const [serverMembers, setServerMembers] = useState<string[]>([]);
+  const [serverMemberDetails, setServerMemberDetails] = useState<User[]>([]);
   const [activeServer, setActiveServer] = useState<string | null>(null);
   const [activeChannel, setActiveChannel] = useState('general');
   const [activePrivateChat, setActivePrivateChat] = useState<string | null>(null);
@@ -88,6 +89,7 @@ export function useSocket(username: string) {
       if (activeChannelRef.current === '' && list.length > 0) {
         const first = list[0];
         setActiveChannel(first.id);
+        setActivePrivateChat(null);
         newSocket.emit('switch_channel', first.id);
       }
     });
@@ -98,6 +100,10 @@ export function useSocket(username: string) {
       setServerMembers(members);
     });
 
+    newSocket.on('server_member_details', ({ serverId, details }) => {
+      setServerMemberDetails(details);
+    });
+
     newSocket.on('friend_status_update', ({ username, status }) => {
       setFriends(prev => prev.map(f => f.username === username ? { ...f, status } : f));
     });
@@ -105,6 +111,7 @@ export function useSocket(username: string) {
     newSocket.on('user_profile_updated', ({ username, displayName, avatar, bio }) => {
       setFriends(prev => prev.map(f => f.username === username ? { ...f, displayName, avatar } : f));
       setUsers(prev => prev.map(u => u.username === username ? { ...u, displayName, avatar, bio } : u));
+      setServerMemberDetails(prev => prev.map(u => u.username === username ? { ...u, displayName, avatar, bio } : u));
     });
 
     newSocket.on('new_friend_request', (request) => {
@@ -227,10 +234,12 @@ export function useSocket(username: string) {
     if (serverId === activeServer) return;
     setActiveServer(serverId);
     setActiveChannel('');
-    setChannels([]); // Clear channels immediately to avoid showing stale data from previous server
+    setServerMemberDetails([]);
     if (serverId) {
+      setActivePrivateChat(null);
       socketRef.current?.emit('get_server_channels', serverId);
     }
+    setChannels([]); // Clear channels immediately to avoid showing stale data from previous server
   };
 
   const sendMessage = (text?: string, file?: string | ArrayBuffer | null) => {
@@ -437,6 +446,7 @@ export function useSocket(username: string) {
     friendRequests,
     privateMessages,
     serverMembers,
+    serverMemberDetails,
     activeServer,
     activeChannel,
     activePrivateChat,

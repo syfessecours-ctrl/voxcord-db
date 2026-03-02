@@ -607,11 +607,26 @@ async function startServer() {
     });
 
     socket.on("get_server_channels", async (serverId) => {
+      // Join server room for member list updates
+      socket.join(`server:${serverId}`);
+      
       const channels = await query("SELECT * FROM channels WHERE server_id = ?", [serverId]);
       socket.emit("channel_list", channels);
 
       const members = await query("SELECT username FROM server_members WHERE server_id = ?", [serverId]);
-      socket.emit("server_members", { serverId, members: members.map((m: any) => m.username) });
+      const memberUsernames = members.map((m: any) => m.username);
+      socket.emit("server_members", { serverId, members: memberUsernames });
+      
+      // Send details for all members (online and offline)
+      if (memberUsernames.length > 0) {
+        const placeholders = memberUsernames.map(() => '?').join(',');
+        const details = await query(`
+          SELECT username, role, display_name as "displayName", avatar, banner, bio, title 
+          FROM users 
+          WHERE username IN (${placeholders})
+        `, memberUsernames);
+        socket.emit("server_member_details", { serverId, details });
+      }
     });
 
     // Voice Signaling
@@ -702,6 +717,20 @@ async function startServer() {
       if (!server || server.owner !== user.username) return socket.emit("error", "Seul le propriétaire peut inviter.");
 
       await execute("INSERT INTO server_members (server_id, username, timestamp) VALUES (?, ?, ?) ON CONFLICT DO NOTHING", [serverId, targetUsername, new Date().toISOString()]);
+
+      // Broadcast updated member list to the server room
+      const members = await query("SELECT username FROM server_members WHERE server_id = ?", [serverId]);
+      const memberUsernames = members.map((m: any) => m.username);
+      io.to(`server:${serverId}`).emit("server_members", { serverId, members: memberUsernames });
+      
+      // Broadcast updated member details to the server room
+      const placeholders = memberUsernames.map(() => '?').join(',');
+      const details = await query(`
+        SELECT username, role, display_name as "displayName", avatar, banner, bio, title 
+        FROM users 
+        WHERE username IN (${placeholders})
+      `, memberUsernames);
+      io.to(`server:${serverId}`).emit("server_member_details", { serverId, details });
 
       // Notify target if online
       for (const [sid, u] of users.entries()) {
@@ -1218,8 +1247,21 @@ async function startServer() {
       
       const userServers = await query("SELECT * FROM servers");
       socket.emit("server_list", userServers);
+      
       const members = await query("SELECT username FROM server_members WHERE server_id = ?", [serverId]);
-      socket.emit("server_members", { serverId, members: members.map((m: any) => m.username) });
+      const memberUsernames = members.map((m: any) => m.username);
+      
+      // Broadcast to server room
+      io.to(`server:${serverId}`).emit("server_members", { serverId, members: memberUsernames });
+      
+      const placeholders = memberUsernames.map(() => '?').join(',');
+      const details = await query(`
+        SELECT username, role, display_name as "displayName", avatar, banner, bio, title 
+        FROM users 
+        WHERE username IN (${placeholders})
+      `, memberUsernames);
+      io.to(`server:${serverId}`).emit("server_member_details", { serverId, details });
+
       await broadcastUserList();
     });
 

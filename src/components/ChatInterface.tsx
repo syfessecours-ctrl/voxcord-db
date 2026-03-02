@@ -48,6 +48,7 @@ interface ChatInterfaceProps {
   friendRequests: FriendRequest[];
   privateMessages: Record<string, PrivateMessage[]>;
   serverMembers: string[];
+  serverMemberDetails: User[];
   activeServer: string | null;
   activeChannel: string;
   activePrivateChat: string | null;
@@ -220,6 +221,7 @@ export function ChatInterface({
   friendRequests,
   privateMessages,
   serverMembers,
+  serverMemberDetails,
   activeServer,
   activeChannel,
   activePrivateChat,
@@ -550,15 +552,29 @@ export function ChatInterface({
   const currentPrivateMessages = activePrivateChat ? (privateMessages[activePrivateChat] || []) : [];
   const filteredUsers = useMemo(() => {
     if (!activeServer) return users;
-    const memberSet = new Set(serverMembers);
-    return users.filter(u => memberSet.has(u.username));
-  }, [users, serverMembers, activeServer]);
+    
+    // Use serverMemberDetails as the base for the member list
+    // It contains all members (online and offline)
+    return serverMemberDetails.map(member => {
+      // Check if member is online by looking in the global users list
+      const onlineUser = users.find(u => u.username === member.username);
+      return {
+        ...member,
+        status: onlineUser ? (onlineUser.status || 'online') : 'offline',
+        id: onlineUser?.id || `offline-${member.username}`
+      };
+    });
+  }, [users, serverMemberDetails, activeServer]);
 
   const groupedUsers = useMemo(() => {
+    const online = filteredUsers.filter(u => u.status !== 'offline');
+    const offline = filteredUsers.filter(u => u.status === 'offline');
+
     return {
-      owner: filteredUsers.filter(u => u.role === 'owner'),
-      moderator: filteredUsers.filter(u => u.role === 'moderator'),
-      user: filteredUsers.filter(u => u.role === 'user'),
+      owner: online.filter(u => u.role === 'owner'),
+      moderator: online.filter(u => u.role === 'moderator'),
+      user: online.filter(u => u.role === 'user'),
+      offline: offline
     };
   }, [filteredUsers]);
 
@@ -2301,11 +2317,11 @@ export function ChatInterface({
       {!showFriendsView && activeServer && (
         <div className="w-72 bg-fit-sidebar border-l border-fit-border hidden lg:flex flex-col z-10">
           <div className="h-16 px-6 flex items-center border-b border-fit-border">
-            <span className="text-[10px] font-black text-fit-muted uppercase tracking-[0.2em]">Membres — {users.length}</span>
+            <span className="text-[10px] font-black text-fit-muted uppercase tracking-[0.2em]">Membres — {filteredUsers.length}</span>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-6 discord-scrollbar">
             {/* Grouped by Roles */}
-            {['owner', 'moderator', 'user'].map(role => {
+            {['owner', 'moderator', 'user', 'offline'].map(role => {
               const roleUsers = groupedUsers[role as keyof typeof groupedUsers];
               if (roleUsers.length === 0) return null;
               
@@ -2313,14 +2329,14 @@ export function ChatInterface({
                 <div key={role} className="space-y-2">
                   <div className="px-2 flex items-center gap-2 text-[9px] font-black text-fit-muted uppercase tracking-[0.2em]">
                     {role === 'owner' && <Lock size={10} className="text-fit-accent" />}
-                    {role === 'owner' ? 'Owners' : role === 'moderator' ? 'Modérateurs' : 'Membres'} — {roleUsers.length}
+                    {role === 'owner' ? 'Owners' : role === 'moderator' ? 'Modérateurs' : role === 'offline' ? 'Hors ligne' : 'Membres'} — {roleUsers.length}
                   </div>
                   <div className="space-y-1">
                     {roleUsers.map(u => (
                       <div 
                         key={u.id} 
                         onClick={() => setViewingUser(u)}
-                        className="group cursor-pointer"
+                        className={cn("group cursor-pointer", role === 'offline' && "opacity-50 grayscale-[0.5] hover:opacity-100 hover:grayscale-0 transition-all")}
                       >
                         <CallsignBanner user={u} size="md" className="hover:scale-[1.02] active:scale-[0.98] transition-transform" />
                       </div>

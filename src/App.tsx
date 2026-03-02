@@ -15,6 +15,7 @@ export default function App() {
     friendRequests,
     privateMessages,
     serverMembers,
+    serverMemberDetails,
     activeServer,
     activeChannel,
     activePrivateChat,
@@ -97,6 +98,7 @@ export default function App() {
       friendRequests={friendRequests}
       privateMessages={privateMessages}
       serverMembers={serverMembers}
+      serverMemberDetails={serverMemberDetails}
       activeServer={activeServer}
       activeChannel={activeChannel}
       activePrivateChat={activePrivateChat}
