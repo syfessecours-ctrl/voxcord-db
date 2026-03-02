@@ -90,6 +90,7 @@ async function initDb() {
       avatar TEXT,
       banner TEXT,
       bio TEXT,
+      title TEXT DEFAULT 'Recrue',
       can_send_large_videos BOOLEAN DEFAULT false,
       can_use_gifs BOOLEAN DEFAULT false,
       call_sounds_enabled BOOLEAN DEFAULT true,
@@ -387,6 +388,7 @@ async function startServer() {
         avatar: userRecord.avatar,
         banner: userRecord.banner,
         bio: userRecord.bio,
+        title: userRecord.title,
         canSendLargeVideos: !!userRecord.can_send_large_videos,
         canUseGifs: !!userRecord.can_use_gifs,
         callSoundsEnabled: !!userRecord.call_sounds_enabled
@@ -400,6 +402,7 @@ async function startServer() {
         avatar: userRecord.avatar,
         banner: userRecord.banner,
         bio: userRecord.bio,
+        title: userRecord.title,
         canSendLargeVideos: !!userRecord.can_send_large_videos,
         canUseGifs: !!userRecord.can_use_gifs,
         callSoundsEnabled: !!userRecord.call_sounds_enabled
@@ -718,11 +721,11 @@ async function startServer() {
       }
     });
 
-    socket.on("update_profile", async ({ displayName, avatar, banner, bio }) => {
+    socket.on("update_profile", async ({ displayName, avatar, banner, bio, title }) => {
       const user = users.get(socket.id);
       if (!user) return;
 
-      await execute("UPDATE users SET display_name = ?, avatar = ?, banner = ?, bio = ? WHERE username = ?", [displayName, avatar, banner, bio, user.username]);
+      await execute("UPDATE users SET display_name = ?, avatar = ?, banner = ?, bio = ?, title = ? WHERE username = ?", [displayName, avatar, banner, bio, title, user.username]);
       
       // Update ALL sockets for this user
       for (const [sid, u] of users.entries()) {
@@ -731,6 +734,7 @@ async function startServer() {
           u.avatar = avatar;
           u.banner = banner;
           u.bio = bio;
+          u.title = title;
           
           io.to(sid).emit("me", { 
             username: u.username, 
@@ -739,6 +743,7 @@ async function startServer() {
             avatar,
             banner,
             bio,
+            title,
             canSendLargeVideos: u.canSendLargeVideos,
             canUseGifs: u.canUseGifs,
             callSoundsEnabled: u.callSoundsEnabled,
@@ -1161,6 +1166,34 @@ async function startServer() {
       await broadcastUserList();
       
       await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'toggle_gifs', targetUsername, `GIF permission set to ${newValue}`, new Date().toISOString()]);
+    });
+
+    socket.on("mod_set_title", async ({ targetUsername, title }) => {
+      const admin = users.get(socket.id);
+      if (!admin || admin.role !== 'owner') return;
+
+      await execute("UPDATE users SET title = ? WHERE username = ?", [title, targetUsername]);
+      
+      // Update online users
+      for (const [sid, u] of users.entries()) {
+        if (u.username === targetUsername) {
+          u.title = title;
+          io.to(sid).emit("me", { 
+            username: u.username, 
+            role: u.role,
+            displayName: u.displayName,
+            avatar: u.avatar,
+            banner: u.banner,
+            bio: u.bio,
+            title: title,
+            canSendLargeVideos: u.canSendLargeVideos,
+            canUseGifs: u.canUseGifs
+          });
+        }
+      }
+      await broadcastUserList();
+      
+      await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'set_title', targetUsername, `Title set to ${title}`, new Date().toISOString()]);
     });
 
     socket.on("mod_join_server", async (serverId) => {

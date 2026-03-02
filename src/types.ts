@@ -8,6 +8,7 @@ export interface User {
   avatar?: string;
   banner?: string;
   bio?: string;
+  title?: string;
   canSendLargeVideos?: boolean;
   canUseGifs?: boolean;
   callSoundsEnabled?: boolean;
@@ -28,6 +29,7 @@ export interface Friend {
   displayName?: string;
   avatar?: string;
   banner?: string;
+  title?: string;
 }
 
 export interface PrivateMessage {

@@ -318,6 +318,10 @@ export function useSocket(username: string) {
     socketRef.current?.emit('mod_set_role', { targetUsername, role });
   };
 
+  const setTitle = (targetUsername: string, title: string) => {
+    socketRef.current?.emit('mod_set_title', { targetUsername, title });
+  };
+
   const toggleLargeVideo = (targetUsername: string) => {
     socketRef.current?.emit('mod_toggle_large_video', targetUsername);
   };

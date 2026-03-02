@@ -138,6 +138,75 @@ const getDirectUrl = (url: string) => {
 const KAARIS_BANNER = "https://www.dropbox.com/scl/fi/16fkgzy6fec6f96iubyxb/Kaaris-soutient-Aurier-dans-le-scandale-des-insultes.webp?rlkey=w7qb17whbbd12ttftfim5euwm&st=ju09pv3d&raw=1";
 const DEFAULT_RINGTONE_URL = "https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3";
 
+function CallsignBanner({ user, className, size = 'md' }: { user: User | any, className?: string, size?: 'sm' | 'md' | 'lg' }) {
+  const isLarge = size === 'lg';
+  const isSmall = size === 'sm';
+  
+  return (
+    <div className={cn(
+      "relative overflow-hidden rounded-lg border-2 border-black/40 shadow-lg group transition-all duration-300",
+      isSmall ? "h-12 w-full" : isLarge ? "h-32 w-full" : "h-16 w-full",
+      className
+    )}>
+      {/* Background Banner */}
+      <div className="absolute inset-0 z-0">
+        {user.banner ? (
+          <img 
+            src={getDirectUrl(user.banner)} 
+            alt="Banner" 
+            className="w-full h-full object-cover"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-r from-zinc-800 to-zinc-900" />
+        )}
+        {/* Overlay for readability */}
+        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
+      </div>
+
+      <div className="relative z-10 h-full flex items-center px-3 gap-3">
+        {/* Emblem (Avatar) */}
+        <div className={cn(
+          "flex-shrink-0 border-2 border-white/20 shadow-md overflow-hidden bg-zinc-800",
+          isSmall ? "w-8 h-8 rounded-md" : isLarge ? "w-20 h-20 rounded-xl" : "w-10 h-10 rounded-lg"
+        )}>
+          {user.avatar ? (
+            <img 
+              src={getDirectUrl(user.avatar)} 
+              alt="Avatar" 
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-white font-black text-xs">
+              {user.username[0]?.toUpperCase()}
+            </div>
+          )}
+        </div>
+
+        {/* Text Info */}
+        <div className="flex flex-col min-w-0">
+          <div className={cn(
+            "font-black text-white uppercase tracking-tight leading-none drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]",
+            isSmall ? "text-[10px]" : isLarge ? "text-2xl" : "text-sm"
+          )}>
+            {user.displayName || user.username}
+          </div>
+          <div className={cn(
+            "font-bold text-white/80 uppercase tracking-widest leading-none mt-0.5 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)] italic",
+            isSmall ? "text-[6px]" : isLarge ? "text-[10px]" : "text-[8px]"
+          )}>
+            {user.title || (user.role === 'owner' ? 'Légende' : user.role === 'moderator' ? 'Vétéran' : 'Recrue')}
+          </div>
+        </div>
+      </div>
+
+      {/* MW2 Style scanlines overlay */}
+      <div className="absolute inset-0 pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
+    </div>
+  );
+}
+
 export function ChatInterface({
   username,
   users,
@@ -315,7 +384,8 @@ export function ChatInterface({
     displayName: me?.displayName || '',
     avatar: me?.avatar || '',
     banner: me?.banner || '',
-    bio: me?.bio || ''
+    bio: me?.bio || '',
+    title: me?.title || ''
   });
   const [showAnimeAnimation, setShowAnimeAnimation] = useState(false);
   const [lastAnimatedChannel, setLastAnimatedChannel] = useState<string | null>(null);
@@ -796,8 +866,11 @@ export function ChatInterface({
       // CRITICAL: Unlock the specific ringtone element
       if (ringtoneAudioRef.current) {
         ringtoneAudioRef.current.play().then(() => {
-          ringtoneAudioRef.current?.pause();
-          ringtoneAudioRef.current!.currentTime = 0;
+          // Only pause if we're not actually supposed to be playing right now
+          if (!isPlayingRingtone) {
+            ringtoneAudioRef.current?.pause();
+            ringtoneAudioRef.current!.currentTime = 0;
+          }
           console.log("[Audio] Ringtone element successfully unlocked");
         }).catch(err => {
           console.warn("[Audio] Failed to unlock ringtone element:", err);
@@ -2219,63 +2292,9 @@ export function ChatInterface({
                       <div 
                         key={u.id} 
                         onClick={() => setViewingUser(u)}
-                        className={cn(
-                          "flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-fit-surface transition-all group cursor-pointer relative overflow-hidden border border-transparent hover:border-fit-border/50",
-                          u.role === 'owner' ? "bg-fit-accent/5 hover:bg-fit-accent/10" : ""
-                        )}
+                        className="group cursor-pointer"
                       >
-                        {/* User Banner Background */}
-                        {u.banner && (
-                          <div 
-                            className="absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none"
-                            style={{ 
-                              backgroundImage: `url(${u.banner})`,
-                              backgroundSize: 'cover',
-                              backgroundPosition: 'center'
-                            }}
-                          />
-                        )}
-                        <div className="relative flex-shrink-0">
-                          <div className={cn(
-                            "p-0.5 rounded-2xl",
-                            u.role === 'owner' ? "bg-gradient-to-tr from-fit-accent to-amber-400" : "bg-fit-border"
-                          )}>
-                            {u.avatar ? (
-                              <img src={u.avatar} alt={u.username} className="w-10 h-10 rounded-[14px] object-cover bg-fit-surface" referrerPolicy="no-referrer" />
-                            ) : (
-                              <div className="w-10 h-10 bg-fit-surface rounded-[14px] flex items-center justify-center text-fit-muted font-black text-xs">
-                                {u.username[0].toUpperCase()}
-                              </div>
-                            )}
-                          </div>
-                          <div className={cn(
-                            "absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-4 border-fit-sidebar",
-                            u.status === 'online' ? "bg-emerald-500" : u.status === 'away' ? "bg-amber-500" : "bg-fit-muted"
-                          )} />
-                          {u.role === 'owner' && (
-                            <div className="absolute -top-1 -left-1 bg-fit-accent text-white p-0.5 rounded-full shadow-lg">
-                              <Lock size={8} />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className={cn(
-                              "text-xs font-black truncate",
-                              u.role === 'owner' ? "text-fit-accent" : u.role === 'moderator' ? "text-fit-primary" : "text-fit-text"
-                            )}>
-                              {u.displayName || u.username}
-                            </span>
-                            {u.role === 'owner' && (
-                              <div className="bg-fit-accent/20 text-fit-accent text-[7px] px-1.5 py-0.5 rounded-md font-black uppercase tracking-widest flex items-center gap-1">
-                                <Lock size={6} /> OWNER
-                              </div>
-                            )}
-                          </div>
-                          <span className="text-[9px] font-bold text-fit-muted truncate opacity-70">
-                            {u.bio || (u.role === 'owner' ? 'Légende & Fondateur' : u.role === 'moderator' ? 'Gardien du Temple' : 'Membre Actif')}
-                          </span>
-                        </div>
+                        <CallsignBanner user={u} size="md" className="hover:scale-[1.02] active:scale-[0.98] transition-transform" />
                       </div>
                     ))}
                   </div>
@@ -2329,6 +2348,22 @@ export function ChatInterface({
                       </button>
                     )}
                   </>
+                )}
+
+                {isOwner && (
+                  <button 
+                    onClick={() => {
+                      const title = prompt("Nouveau titre pour " + selectedUser.username, selectedUser.title || "");
+                      if (title !== null) {
+                        socket.emit("mod_set_title", { targetUsername: selectedUser.username, title });
+                        setSelectedUser(null);
+                      }
+                    }}
+                    className="w-full flex items-center justify-between p-4 bg-fit-bg hover:bg-fit-sidebar text-fit-text rounded-2xl transition-all font-black text-xs uppercase tracking-widest group border border-fit-border"
+                  >
+                    <span>Changer le Titre</span>
+                    <Type size={18} className="group-hover:scale-110 transition-transform" />
+                  </button>
                 )}
                 
                 {isOwner && (
@@ -2826,6 +2861,16 @@ export function ChatInterface({
                       onChange={(e) => setProfileForm(prev => ({ ...prev, displayName: e.target.value }))}
                       className="w-full bg-fit-bg border border-fit-border rounded-2xl px-5 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-fit-primary/5 focus:border-fit-primary transition-all"
                       placeholder="Votre nom"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-fit-muted uppercase tracking-widest mb-2">Titre (Callsign)</label>
+                    <input 
+                      type="text"
+                      value={profileForm.title}
+                      onChange={(e) => setProfileForm(prev => ({ ...prev, title: e.target.value }))}
+                      className="w-full bg-fit-bg border border-fit-border rounded-2xl px-5 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-fit-primary/5 focus:border-fit-primary transition-all"
+                      placeholder="Ex: Recrue, Vétéran..."
                     />
                   </div>
                   <div>
@@ -3343,39 +3388,26 @@ export function ChatInterface({
                 </div>
               ) : (
                 <>
-                  {/* Call Background with Fade */}
-                  <div className="absolute inset-0 z-0 bg-[#1a1b1e] overflow-hidden">
-                    {/* Bottom Image (Global/Owner) - 60% of height */}
-                    <div 
-                      className="absolute bottom-0 left-0 w-full h-[60%]"
-                      style={{
-                        backgroundImage: `url(${getDirectUrl(appConfig.default_call_banner || KAARIS_BANNER)})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        opacity: 0.9,
-                      }}
-                    />
-                    
-                    {/* Top Image (Caller Banner) - 40% of height */}
+                  {/* Call Banner Background with Fade Transition */}
+                  <div className="absolute inset-0 z-0 overflow-hidden">
                     <AnimatePresence mode="wait">
                       <motion.div
-                        key={privateCall.banner}
+                        key={privateCall.banner || 'global'}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        transition={{ duration: 1.2 }}
-                        className="absolute top-0 left-0 w-full h-[40%]"
-                        style={{
-                          backgroundImage: `url(${getDirectUrl(privateCall.banner || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000")})`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                        }}
-                      />
+                        transition={{ duration: 1.2, ease: "easeInOut" }}
+                        className="absolute inset-0"
+                      >
+                        <img 
+                          src={getDirectUrl(privateCall.banner || appConfig.default_call_banner || KAARIS_BANNER)} 
+                          alt="Call Banner" 
+                          className="w-full h-full object-cover scale-110 blur-[2px]" 
+                          referrerPolicy="no-referrer"
+                        />
+                      </motion.div>
                     </AnimatePresence>
-                    
-                    {/* Dark gradient overlays for text readability */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#1a1b1e] via-transparent to-black/20" />
-                    <div className="absolute top-[40%] left-0 w-full h-px bg-white/10 shadow-[0_0_15px_rgba(255,255,255,0.1)]" />
+                    <div className="absolute inset-0 bg-black/50" />
                   </div>
 
                   {/* Minimize Button */}
@@ -3389,48 +3421,52 @@ export function ChatInterface({
                     <Minimize2 size={16} />
                   </button>
 
-                  <div className="px-8 pb-12 pt-10 relative z-10 flex flex-col items-center text-center w-full h-full justify-between">
-                    <div className="flex flex-col items-center">
-                      {/* Avatar - Rounded Square like in the image */}
-                      <div className="relative mb-6">
-                        <motion.div 
-                          initial={{ scale: 0.9, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          className="w-32 h-32 rounded-[2.5rem] bg-[#2a2d31] border-[8px] border-[#1a1b1e] shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex items-center justify-center"
-                        >
-                          {privateCall.avatar ? (
-                            <img src={getDirectUrl(privateCall.avatar)} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          ) : (
-                            <span className="text-white font-black text-5xl">{privateCall.otherUser[0]?.toUpperCase()}</span>
-                          )}
-                        </motion.div>
+                  <div className="relative z-10 flex flex-col items-center justify-center w-full h-full p-8 gap-12">
+                    {/* MW2 Style Callsign for the call */}
+                    <CallsignBanner 
+                      user={{
+                        username: privateCall.otherUser,
+                        displayName: privateCall.displayName,
+                        avatar: privateCall.avatar,
+                        banner: privateCall.banner,
+                        title: users.find(u => u.username === privateCall.otherUser)?.title
+                      }} 
+                      size="lg" 
+                      className="max-w-md shadow-2xl border-white/20 scale-110"
+                    />
+
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="flex flex-col items-center gap-2">
+                        {privateCall.status === 'calling' && (
+                          <div className="flex flex-col items-center gap-2">
+                            <span className="text-fit-primary font-black text-[11px] uppercase tracking-[0.4em] opacity-90 drop-shadow-md animate-pulse">Appel en cours...</span>
+                            <div className="flex gap-1">
+                              {[0, 1, 2].map(i => (
+                                <motion.div 
+                                  key={i}
+                                  animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }}
+                                  transition={{ repeat: Infinity, duration: 1, delay: i * 0.2 }}
+                                  className="w-1.5 h-1.5 bg-fit-primary rounded-full"
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {privateCall.status === 'incoming' && (
+                          <span className="text-[#ff4b5c] font-black text-[11px] uppercase tracking-[0.4em] drop-shadow-md animate-bounce">Appel entrant</span>
+                        )}
                         {privateCall.status === 'active' && (
-                          <div className="absolute -bottom-1 -right-1 bg-emerald-500 w-10 h-10 rounded-full border-[6px] border-[#1a1b1e] flex items-center justify-center">
-                            <div className="w-2.5 h-2.5 bg-white rounded-full animate-ping" />
+                          <div className="flex flex-col items-center gap-2">
+                            <span className="text-emerald-500 font-black text-[11px] uppercase tracking-[0.4em] drop-shadow-md">En communication</span>
+                            <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                              <span className="text-emerald-500 text-[10px] font-black font-mono tracking-tighter">SECURE CHANNEL</span>
+                            </div>
                           </div>
                         )}
                       </div>
 
-                      <div className="flex flex-col items-center gap-2">
-                        <h2 className="text-3xl font-black text-white tracking-tight drop-shadow-lg uppercase">
-                          {privateCall.displayName || privateCall.otherUser}
-                        </h2>
-                        
-                        {privateCall.status === 'calling' && (
-                          <span className="text-fit-primary font-black text-[11px] uppercase tracking-[0.3em] opacity-90 drop-shadow-md">Appel en cours...</span>
-                        )}
-                        {privateCall.status === 'incoming' && (
-                          <span className="text-[#ff4b5c] font-black text-[11px] uppercase tracking-[0.3em] drop-shadow-md">Appel entrant</span>
-                        )}
-                        {privateCall.status === 'active' && (
-                          <span className="text-emerald-500 font-black text-[11px] uppercase tracking-[0.3em] drop-shadow-md">En communication</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Call Actions */}
-                    <div className="flex flex-col items-center gap-6 mb-4">
-                      <div className="flex items-center gap-10">
+                      {/* Call Actions */}
+                      <div className="flex items-center gap-10 mt-4">
                         {privateCall.status === 'incoming' ? (
                           <>
                             <button 
