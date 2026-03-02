@@ -33,6 +33,7 @@ import {
   Monitor,
   Minimize2,
   Maximize2,
+  Phone,
   Type,
   FileText,
   Activity,
@@ -3651,7 +3652,7 @@ export function ChatInterface({
                           className="absolute inset-0"
                         >
                           <img 
-                            src={getDirectUrl(privateCall.banner || appConfig.default_call_banner || KAARIS_BANNER)} 
+                            src={getDirectUrl(appConfig.default_call_banner || privateCall.banner || KAARIS_BANNER)} 
                             alt="Call Banner" 
                             className="w-full h-full object-cover scale-110 blur-[2px]" 
                             referrerPolicy="no-referrer"
@@ -3730,7 +3731,7 @@ export function ChatInterface({
                               onClick={acceptCall}
                               className="w-20 h-20 bg-[#00c896] text-white rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(0,200,150,0.3)] hover:scale-110 active:scale-95 transition-all group"
                             >
-                              <Video size={32} className="group-hover:scale-110 transition-transform" />
+                              <Phone size={32} className="group-hover:scale-110 transition-transform" />
                             </button>
                           </>
                         ) : (
