@@ -1,5 +1,5 @@
 {
-  "name": "FitCord",
+  "name": "Remix: FitCord",
   "description": "A professional fitness community platform inspired by Discord, featuring real-time chat, voice channels, and private calls.",
   "requestFramePermissions": [
     "camera",

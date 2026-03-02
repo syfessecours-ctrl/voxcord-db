@@ -32,7 +32,8 @@ import {
   Video,
   Monitor,
   Minimize2,
-  Maximize2
+  Maximize2,
+  Type
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { User, Channel, Message, Friend, FriendRequest, PrivateMessage, Server as ServerType } from '../types';
@@ -73,6 +74,7 @@ interface ChatInterfaceProps {
   onUpdateChannelBackground: (channelId: string, backgroundUrl: string) => void;
   onUpdateChannelDescription: (channelId: string, description: string) => void;
   onSetRole: (targetUsername: string, role: string) => void;
+  onSetTitle: (targetUsername: string, title: string) => void;
   onSendFriendRequest: (targetUsername: string) => void;
   onRespondFriendRequest: (requestId: number, response: 'accepted' | 'rejected') => void;
   onUpdateStatus: (status: 'online' | 'away') => void;
@@ -242,6 +244,7 @@ export function ChatInterface({
   onUpdateChannelBackground,
   onUpdateChannelDescription,
   onSetRole,
+  onSetTitle,
   onSendFriendRequest,
   onRespondFriendRequest,
   onUpdateStatus,
@@ -476,7 +479,8 @@ export function ChatInterface({
         displayName: me.displayName || '',
         avatar: me.avatar || '',
         banner: me.banner || '',
-        bio: me.bio || ''
+        bio: me.bio || '',
+        title: me.title || ''
       });
     }
   }, [me]);
@@ -2355,7 +2359,7 @@ export function ChatInterface({
                     onClick={() => {
                       const title = prompt("Nouveau titre pour " + selectedUser.username, selectedUser.title || "");
                       if (title !== null) {
-                        socket.emit("mod_set_title", { targetUsername: selectedUser.username, title });
+                        onSetTitle(selectedUser.username, title);
                         setSelectedUser(null);
                       }
                     }}

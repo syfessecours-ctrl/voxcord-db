@@ -472,6 +472,7 @@ export function useSocket(username: string) {
     updateChannelBackground,
     updateChannelDescription,
     setRole,
+    onSetTitle: setTitle,
     switchChannel,
     joinVoice,
     leaveVoice,

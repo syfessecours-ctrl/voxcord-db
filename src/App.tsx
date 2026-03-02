@@ -54,6 +54,7 @@ export default function App() {
     updateChannelBackground,
     updateChannelDescription,
     setRole,
+    onSetTitle,
     switchChannel,
     joinVoice,
     leaveVoice,
@@ -121,6 +122,7 @@ export default function App() {
       onUpdateChannelBackground={updateChannelBackground}
       onUpdateChannelDescription={updateChannelDescription}
       onSetRole={setRole}
+      onSetTitle={onSetTitle}
       onSendFriendRequest={sendFriendRequest}
       onRespondFriendRequest={respondFriendRequest}
       onUpdateStatus={updateStatus}
