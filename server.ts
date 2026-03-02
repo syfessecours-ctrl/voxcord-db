@@ -175,6 +175,7 @@ async function initDb() {
       { sql: "ALTER TABLE users ADD COLUMN banner TEXT;", code: "42701" },
       { sql: "ALTER TABLE users ADD COLUMN can_send_large_videos BOOLEAN DEFAULT false;", code: "42701" },
       { sql: "ALTER TABLE users ADD COLUMN can_use_gifs BOOLEAN DEFAULT false;", code: "42701" },
+      { sql: "ALTER TABLE users ADD COLUMN title TEXT;", code: "42701" },
       { sql: "ALTER TABLE users ADD COLUMN call_sounds_enabled BOOLEAN DEFAULT true;", code: "42701" },
       { sql: "ALTER TABLE users ADD COLUMN ringtone_url TEXT;", code: "42701" },
       { sql: "ALTER TABLE channels ADD COLUMN server_id TEXT;", code: "42701" },
@@ -213,6 +214,7 @@ async function initDb() {
       "ALTER TABLE users ADD COLUMN banner TEXT;",
       "ALTER TABLE users ADD COLUMN can_send_large_videos BOOLEAN DEFAULT false;",
       "ALTER TABLE users ADD COLUMN can_use_gifs BOOLEAN DEFAULT false;",
+      "ALTER TABLE users ADD COLUMN title TEXT;",
       "ALTER TABLE users ADD COLUMN call_sounds_enabled BOOLEAN DEFAULT true;",
       "ALTER TABLE users ADD COLUMN ringtone_url TEXT;"
     ];
