@@ -33,7 +33,10 @@ import {
   Monitor,
   Minimize2,
   Maximize2,
-  Type
+  Type,
+  FileText,
+  Activity,
+  Layout
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { User, Channel, Message, Friend, FriendRequest, PrivateMessage, Server as ServerType } from '../types';
@@ -49,6 +52,9 @@ interface ChatInterfaceProps {
   privateMessages: Record<string, PrivateMessage[]>;
   serverMembers: string[];
   serverMemberDetails: User[];
+  modBans: any[];
+  modLogs: any[];
+  modStats: any;
   activeServer: string | null;
   activeChannel: string;
   activePrivateChat: string | null;
@@ -65,6 +71,10 @@ interface ChatInterfaceProps {
   me: User | null;
   onKickUser: (targetUsername: string, reason: string) => void;
   onBanUser: (targetUsername: string, reason: string) => void;
+  onUnbanUser: (ip?: string, username?: string) => void;
+  onGetModBans: () => void;
+  onGetModLogs: () => void;
+  onGetModStats: () => void;
   onDeleteMessage: (messageId: number) => void;
   onClearChannel: (channelId: string) => void;
   onDeleteServer: (serverId: string) => void;
@@ -74,6 +84,7 @@ interface ChatInterfaceProps {
   onUnlockChannel: (channelId: string) => void;
   onUpdateChannelBackground: (channelId: string, backgroundUrl: string) => void;
   onUpdateChannelDescription: (channelId: string, description: string) => void;
+  onUpdateUserRole: (targetUsername: string, role?: string, color?: string) => void;
   onSetRole: (targetUsername: string, role: string) => void;
   onSetTitle: (targetUsername: string, title: string) => void;
   onSendFriendRequest: (targetUsername: string) => void;
@@ -190,10 +201,13 @@ function CallsignBanner({ user, className, size = 'md' }: { user: User | any, cl
 
         {/* Text Info */}
         <div className="flex flex-col min-w-0">
-          <div className={cn(
-            "font-black text-white uppercase tracking-tight leading-none drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]",
-            isSmall ? "text-[10px]" : isLarge ? "text-2xl" : "text-sm"
-          )}>
+          <div 
+            className={cn(
+              "font-black text-white uppercase tracking-tight leading-none drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]",
+              isSmall ? "text-[10px]" : isLarge ? "text-2xl" : "text-sm"
+            )}
+            style={{ color: user.roleColor || '#ffffff' }}
+          >
             {user.displayName || user.username}
           </div>
           <div className={cn(
@@ -222,6 +236,9 @@ export function ChatInterface({
   privateMessages,
   serverMembers,
   serverMemberDetails,
+  modBans,
+  modLogs,
+  modStats,
   activeServer,
   activeChannel,
   activePrivateChat,
@@ -237,6 +254,10 @@ export function ChatInterface({
   me,
   onKickUser,
   onBanUser,
+  onUnbanUser,
+  onGetModBans,
+  onGetModLogs,
+  onGetModStats,
   onDeleteMessage,
   onClearChannel,
   onDeleteServer,
@@ -246,6 +267,7 @@ export function ChatInterface({
   onUnlockChannel,
   onUpdateChannelBackground,
   onUpdateChannelDescription,
+  onUpdateUserRole,
   onSetRole,
   onSetTitle,
   onSendFriendRequest,
@@ -401,6 +423,9 @@ export function ChatInterface({
   });
   const [showAnimeAnimation, setShowAnimeAnimation] = useState(false);
   const [lastAnimatedChannel, setLastAnimatedChannel] = useState<string | null>(null);
+  const [showModPanel, setShowModPanel] = useState(false);
+  const [modPanelTab, setModPanelTab] = useState<'logs' | 'bans' | 'stats'>('logs');
+  const [roleColorInput, setRoleColorInput] = useState('#ffffff');
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -546,7 +571,9 @@ export function ChatInterface({
     onUpdateProfile(profileForm);
     setShowProfileModal(false);
   };
-  const isOwner = me?.role === 'owner';
+  const currentServer = servers.find(s => s.id === activeServer);
+  const isServerOwner = currentServer?.owner === username;
+  const isOwner = me?.role === 'owner' || isServerOwner;
   const isMod = isOwner || me?.role === 'moderator';
 
   const currentPrivateMessages = activePrivateChat ? (privateMessages[activePrivateChat] || []) : [];
@@ -1288,10 +1315,8 @@ export function ChatInterface({
     }
   };
 
-  const currentServer = servers.find(s => s.id === activeServer);
   const currentChannel = channels.find(c => c.id === activeChannel);
 
-  const isServerOwner = currentServer?.owner === username;
   const canManageChannel = isOwner || isServerOwner;
 
   const canCreateServer = !servers.some(s => s.owner === username) || me?.role === 'owner';
@@ -1379,6 +1404,26 @@ export function ChatInterface({
               title="Créer un espace"
             >
               <Plus size={24} />
+            </button>
+          )}
+
+          {isOwner && (
+            <button 
+              onClick={() => {
+                onGetModBans();
+                onGetModLogs();
+                setShowModPanel(true);
+              }}
+              className={cn(
+                "w-12 h-12 rounded-[24px] flex items-center justify-center transition-all cursor-pointer group relative overflow-hidden mt-auto",
+                showModPanel ? "bg-fit-accent text-white rounded-[16px]" : "bg-fit-surface text-fit-accent hover:bg-fit-accent hover:text-white hover:rounded-[16px]"
+              )}
+              title="Panel de Contrôle"
+            >
+              <ShieldAlert size={24} />
+              {showModPanel && (
+                <div className="absolute -left-2 w-1 h-8 bg-fit-accent rounded-r-full" />
+              )}
             </button>
           )}
         </div>
@@ -2175,6 +2220,7 @@ export function ChatInterface({
                               <div className="flex items-center gap-2 mb-1 px-1">
                                 <span 
                                   className="font-black text-fit-text text-[11px] cursor-pointer hover:underline"
+                                  style={{ color: user?.roleColor || 'inherit' }}
                                   onClick={() => {
                                     if (user) setViewingUser(user);
                                   }}
@@ -2373,10 +2419,34 @@ export function ChatInterface({
 
               <div className="space-y-3">
                 {isOwner && (
-                  <>
+                  <div className="space-y-3">
+                    <div className="p-4 bg-fit-bg rounded-2xl border border-fit-border space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-fit-muted uppercase tracking-widest">Couleur du Rôle</span>
+                        <input 
+                          type="color" 
+                          value={roleColorInput}
+                          onChange={(e) => setRoleColorInput(e.target.value)}
+                          className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-none"
+                        />
+                      </div>
+                      <button 
+                        onClick={() => {
+                          onUpdateUserRole(selectedUser.username, undefined, roleColorInput);
+                          showAlert("Couleur du rôle mise à jour !");
+                        }}
+                        className="w-full py-2 bg-fit-primary text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-fit-primary-hover transition-all"
+                      >
+                        Appliquer la Couleur
+                      </button>
+                    </div>
+
                     {selectedUser.role !== 'moderator' ? (
                       <button 
-                        onClick={() => handleSetRole(selectedUser.username, 'moderator')}
+                        onClick={() => {
+                          onUpdateUserRole(selectedUser.username, 'moderator');
+                          setSelectedUser(null);
+                        }}
                         className="w-full flex items-center justify-between p-4 bg-fit-primary/10 hover:bg-fit-primary text-fit-primary hover:text-white rounded-2xl transition-all font-black text-xs uppercase tracking-widest group"
                       >
                         <span>Promouvoir Modérateur</span>
@@ -2384,14 +2454,17 @@ export function ChatInterface({
                       </button>
                     ) : (
                       <button 
-                        onClick={() => handleSetRole(selectedUser.username, 'user')}
+                        onClick={() => {
+                          onUpdateUserRole(selectedUser.username, 'user');
+                          setSelectedUser(null);
+                        }}
                         className="w-full flex items-center justify-between p-4 bg-fit-bg hover:bg-fit-sidebar text-fit-muted rounded-2xl transition-all font-black text-xs uppercase tracking-widest group border border-fit-border"
                       >
                         <span>Rétrograder</span>
                         <UserX size={18} className="group-hover:scale-110 transition-transform" />
                       </button>
                     )}
-                  </>
+                  </div>
                 )}
 
                 {isOwner && (
@@ -3105,7 +3178,12 @@ export function ChatInterface({
 
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-xl font-black tracking-tight">{viewingUser.displayName || viewingUser.username}</h3>
+                    <h3 
+                      className="text-xl font-black tracking-tight"
+                      style={{ color: viewingUser.roleColor || 'inherit' }}
+                    >
+                      {viewingUser.displayName || viewingUser.username}
+                    </h3>
                     <p className="text-xs font-bold text-fit-muted">@{viewingUser.username}</p>
                   </div>
 
@@ -3675,6 +3753,196 @@ export function ChatInterface({
                   <RemoteVideo stream={privateRemoteStream} />
                 </div>
               )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Moderation Panel Modal */}
+      <AnimatePresence>
+        {showModPanel && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 40 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 40 }}
+              className="w-full max-w-4xl h-[80vh] bg-fit-surface rounded-[3rem] border border-fit-border shadow-2xl flex flex-col overflow-hidden"
+            >
+              {/* Header */}
+              <div className="p-8 border-b border-fit-border flex items-center justify-between bg-fit-bg/50">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-fit-accent/20 text-fit-accent rounded-2xl flex items-center justify-center">
+                    <ShieldAlert size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-fit-text tracking-tight">Panel de Contrôle</h2>
+                    <p className="text-[10px] font-black text-fit-muted uppercase tracking-widest opacity-60">Administration Système — FitCord</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowModPanel(false)}
+                  className="p-3 hover:bg-fit-bg rounded-2xl transition-all text-fit-muted hover:text-fit-text"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex border-b border-fit-border px-8">
+                <button 
+                  onClick={() => setModPanelTab('logs')}
+                  className={cn(
+                    "px-6 py-4 font-black text-xs uppercase tracking-widest transition-all relative",
+                    modPanelTab === 'logs' ? "text-fit-primary" : "text-fit-muted hover:text-fit-text"
+                  )}
+                >
+                  Logs de Modération
+                  {modPanelTab === 'logs' && <motion.div layoutId="modTab" className="absolute bottom-0 left-0 w-full h-1 bg-fit-primary rounded-t-full" />}
+                </button>
+                <button 
+                  onClick={() => setModPanelTab('bans')}
+                  className={cn(
+                    "px-6 py-4 font-black text-xs uppercase tracking-widest transition-all relative",
+                    modPanelTab === 'bans' ? "text-fit-primary" : "text-fit-muted hover:text-fit-text"
+                  )}
+                >
+                  Gestion des Bannissements
+                  {modPanelTab === 'bans' && <motion.div layoutId="modTab" className="absolute bottom-0 left-0 w-full h-1 bg-fit-primary rounded-t-full" />}
+                </button>
+                <button 
+                  onClick={() => {
+                    onGetModStats();
+                    setModPanelTab('stats');
+                  }}
+                  className={cn(
+                    "px-6 py-4 font-black text-xs uppercase tracking-widest transition-all relative",
+                    modPanelTab === 'stats' ? "text-fit-primary" : "text-fit-muted hover:text-fit-text"
+                  )}
+                >
+                  Statistiques Système
+                  {modPanelTab === 'stats' && <motion.div layoutId="modTab" className="absolute bottom-0 left-0 w-full h-1 bg-fit-primary rounded-t-full" />}
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-8 discord-scrollbar bg-fit-bg/20">
+                {modPanelTab === 'logs' ? (
+                  <div className="space-y-4">
+                    {modLogs.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-20 text-fit-muted opacity-40">
+                        <FileText size={48} className="mb-4" />
+                        <p className="font-black text-xs uppercase tracking-widest">Aucun log disponible</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-3">
+                        {modLogs.map((log: any) => (
+                          <div key={log.id} className="bg-fit-surface p-4 rounded-2xl border border-fit-border flex items-center justify-between group hover:border-fit-primary/30 transition-all">
+                            <div className="flex items-center gap-4">
+                              <div className={cn(
+                                "w-10 h-10 rounded-xl flex items-center justify-center text-white",
+                                log.action === 'ban' ? "bg-fit-accent" : log.action === 'kick' ? "bg-amber-500" : "bg-fit-primary"
+                              )}>
+                                {log.action === 'ban' ? <ShieldAlert size={18} /> : log.action === 'kick' ? <UserX size={18} /> : <FileText size={18} />}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-black text-xs text-fit-text">@{log.admin}</span>
+                                  <span className="text-[10px] font-bold text-fit-muted uppercase tracking-widest">a {log.action === 'ban' ? 'banni' : log.action === 'kick' ? 'expulsé' : 'modifié'}</span>
+                                  <span className="font-black text-xs text-fit-accent">@{log.target}</span>
+                                </div>
+                                <p className="text-[10px] font-medium text-fit-muted mt-1 italic">"{log.reason}"</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-[10px] font-black text-fit-muted uppercase tracking-tighter">
+                                {new Date(log.timestamp).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : modPanelTab === 'bans' ? (
+                  <div className="space-y-4">
+                    {modBans.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-20 text-fit-muted opacity-40">
+                        <ShieldAlert size={48} className="mb-4" />
+                        <p className="font-black text-xs uppercase tracking-widest">Aucun bannissement actif</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-3">
+                        {modBans.map((ban: any) => (
+                          <div key={ban.ip} className="bg-fit-surface p-4 rounded-2xl border border-fit-border flex items-center justify-between group hover:border-fit-accent/30 transition-all">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 bg-fit-accent/10 text-fit-accent rounded-xl flex items-center justify-center">
+                                <ShieldAlert size={18} />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-black text-xs text-fit-text">IP: {ban.ip}</span>
+                                </div>
+                                <p className="text-[10px] font-medium text-fit-muted mt-1 italic">Raison: {ban.reason}</p>
+                                <p className="text-[9px] font-bold text-fit-muted/50 uppercase tracking-widest mt-1">
+                                  Banni le {new Date(ban.timestamp).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => {
+                                onUnbanUser(ban.ip);
+                                showAlert(`Bannissement révoqué pour ${ban.ip}`);
+                              }}
+                              className="px-4 py-2 bg-fit-accent/10 text-fit-accent hover:bg-fit-accent hover:text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+                            >
+                              Révoquer
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {modStats ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="bg-fit-surface p-8 rounded-[2rem] border border-fit-border shadow-sm flex flex-col items-center text-center">
+                          <div className="w-12 h-12 bg-fit-primary/10 text-fit-primary rounded-2xl flex items-center justify-center mb-4">
+                            <Users size={24} />
+                          </div>
+                          <div className="text-3xl font-black text-fit-text mb-1">{modStats.users}</div>
+                          <div className="text-[10px] font-black text-fit-muted uppercase tracking-widest">Utilisateurs</div>
+                        </div>
+                        <div className="bg-fit-surface p-8 rounded-[2rem] border border-fit-border shadow-sm flex flex-col items-center text-center">
+                          <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 rounded-2xl flex items-center justify-center mb-4">
+                            <Activity size={24} />
+                          </div>
+                          <div className="text-3xl font-black text-fit-text mb-1">{modStats.online}</div>
+                          <div className="text-[10px] font-black text-fit-muted uppercase tracking-widest">En Ligne</div>
+                        </div>
+                        <div className="bg-fit-surface p-8 rounded-[2rem] border border-fit-border shadow-sm flex flex-col items-center text-center">
+                          <div className="w-12 h-12 bg-fit-accent/10 text-fit-accent rounded-2xl flex items-center justify-center mb-4">
+                            <MessageSquare size={24} />
+                          </div>
+                          <div className="text-3xl font-black text-fit-text mb-1">{modStats.messages}</div>
+                          <div className="text-[10px] font-black text-fit-muted uppercase tracking-widest">Messages</div>
+                        </div>
+                        <div className="bg-fit-surface p-8 rounded-[2rem] border border-fit-border shadow-sm flex flex-col items-center text-center">
+                          <div className="w-12 h-12 bg-amber-500/10 text-amber-500 rounded-2xl flex items-center justify-center mb-4">
+                            <Layout size={24} />
+                          </div>
+                          <div className="text-3xl font-black text-fit-text mb-1">{modStats.servers}</div>
+                          <div className="text-[10px] font-black text-fit-muted uppercase tracking-widest">Espaces</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center py-20">
+                        <div className="w-12 h-12 border-4 border-fit-primary border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </motion.div>
           </div>
         )}

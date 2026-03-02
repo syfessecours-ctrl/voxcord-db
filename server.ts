@@ -94,7 +94,8 @@ async function initDb() {
       can_send_large_videos BOOLEAN DEFAULT false,
       can_use_gifs BOOLEAN DEFAULT false,
       call_sounds_enabled BOOLEAN DEFAULT true,
-      ringtone_url TEXT
+      ringtone_url TEXT,
+      role_color TEXT DEFAULT '#ffffff'
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -228,7 +229,8 @@ async function initDb() {
     }
   }
 
-  await execute("INSERT INTO servers (id, name, owner, timestamp) VALUES ('fitcord-global', 'FitCord Global', 'system', '2026-02-27T00:00:00.000Z') ON CONFLICT DO NOTHING");
+  await execute("INSERT INTO servers (id, name, owner, timestamp) VALUES ('fitcord-global', 'FitCord Global', 'Vdw6200', '2026-02-27T00:00:00.000Z') ON CONFLICT (id) DO UPDATE SET owner = 'Vdw6200'");
+  await execute("UPDATE users SET role = 'owner' WHERE username = 'Vdw6200'");
   await execute("INSERT INTO channels (id, name, type, server_id, description) VALUES ('fit-zone', 'fit-zone', 'text', 'fitcord-global', 'Entrée stylée garantie !') ON CONFLICT DO NOTHING");
   await execute("INSERT INTO channels (id, name, type, server_id) VALUES ('general', 'général', 'text', 'fitcord-global') ON CONFLICT DO NOTHING");
   await execute("INSERT INTO app_config (key, value) VALUES ('logo_url', 'https://m.media-amazon.com/images/M/MV5BNDg4NjM1YjYtMzcyZC00NjZlLTk0Y2QtNzI3MGEzZDUyZDExXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg') ON CONFLICT (key) DO NOTHING");
@@ -1031,6 +1033,72 @@ async function startServer() {
 
         await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'ban', targetUsername, reason, new Date().toISOString()]);
       }
+    });
+
+    socket.on("mod_unban", async ({ ip, username }) => {
+      const admin = users.get(socket.id);
+      if (!admin || admin.role !== 'owner') return;
+
+      if (ip) {
+        await execute("DELETE FROM banned_ips WHERE ip = ?", [ip]);
+      } else if (username) {
+        const targetUser = await getOne("SELECT last_ip FROM users WHERE username = ?", [username]);
+        if (targetUser?.last_ip) {
+          await execute("DELETE FROM banned_ips WHERE ip = ?", [targetUser.last_ip]);
+        }
+      }
+      
+      await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'unban', username || ip, 'Révoqué par propriétaire', new Date().toISOString()]);
+      
+      // Refresh banned list for admin
+      const bans = await query("SELECT * FROM banned_ips");
+      socket.emit("mod_bans_list", bans);
+    });
+
+    socket.on("mod_get_bans", async () => {
+      const admin = users.get(socket.id);
+      if (!admin || admin.role !== 'owner') return;
+      const bans = await query("SELECT * FROM banned_ips");
+      socket.emit("mod_bans_list", bans);
+    });
+
+    socket.on("mod_get_stats", async () => {
+      const admin = users.get(socket.id);
+      if (!admin || admin.role !== 'owner') return;
+
+      const userCount = await getOne("SELECT COUNT(*) as count FROM users");
+      const messageCount = await getOne("SELECT COUNT(*) as count FROM messages");
+      const serverCount = await getOne("SELECT COUNT(*) as count FROM servers");
+      const onlineCount = users.size;
+
+      socket.emit("mod_stats", {
+        users: userCount.count,
+        messages: messageCount.count,
+        servers: serverCount.count,
+        online: onlineCount
+      });
+    });
+
+    socket.on("mod_get_logs", async () => {
+      const admin = users.get(socket.id);
+      if (!admin || admin.role !== 'owner') return;
+      const logs = await query("SELECT * FROM mod_logs ORDER BY timestamp DESC LIMIT 100");
+      socket.emit("mod_logs_list", logs);
+    });
+
+    socket.on("update_user_role", async ({ targetUsername, role, color }) => {
+      const admin = users.get(socket.id);
+      if (!admin || admin.role !== 'owner') return;
+
+      if (role) await execute("UPDATE users SET role = ? WHERE username = ?", [role, targetUsername]);
+      if (color) await execute("UPDATE users SET role_color = ? WHERE username = ?", [color, targetUsername]);
+
+      // Broadcast update to all clients
+      const updatedUser = await getOne("SELECT username, role, display_name as \"displayName\", avatar, bio, title, role_color as \"roleColor\" FROM users WHERE username = ?", [targetUsername]);
+      io.emit("user_profile_updated", updatedUser);
+      
+      await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'update_role', targetUsername, `Role: ${role}, Color: ${color}`, new Date().toISOString()]);
+      await broadcastUserList();
     });
 
     socket.on("mod_delete_message", async (messageId) => {

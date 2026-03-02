@@ -13,6 +13,7 @@ export interface User {
   canUseGifs?: boolean;
   callSoundsEnabled?: boolean;
   ringtoneUrl?: string;
+  roleColor?: string;
 }
 
 export interface FriendRequest {

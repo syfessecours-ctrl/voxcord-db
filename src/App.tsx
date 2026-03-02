@@ -16,6 +16,9 @@ export default function App() {
     privateMessages,
     serverMembers,
     serverMemberDetails,
+    modBans,
+    modLogs,
+    modStats,
     activeServer,
     activeChannel,
     activePrivateChat,
@@ -45,6 +48,10 @@ export default function App() {
     switchPrivateChat,
     kickUser,
     banUser,
+    unbanUser,
+    getModBans,
+    getModLogs,
+    getModStats,
     deleteMessage,
     clearChannel,
     deleteServer,
@@ -55,6 +62,7 @@ export default function App() {
     unlockChannel,
     updateChannelBackground,
     updateChannelDescription,
+    updateUserRole,
     setRole,
     onSetTitle,
     switchChannel,
@@ -99,6 +107,9 @@ export default function App() {
       privateMessages={privateMessages}
       serverMembers={serverMembers}
       serverMemberDetails={serverMemberDetails}
+      modBans={modBans}
+      modLogs={modLogs}
+      modStats={modStats}
       activeServer={activeServer}
       activeChannel={activeChannel}
       activePrivateChat={activePrivateChat}
@@ -115,6 +126,10 @@ export default function App() {
       me={me}
       onKickUser={kickUser}
       onBanUser={banUser}
+      onUnbanUser={unbanUser}
+      onGetModBans={getModBans}
+      onGetModLogs={getModLogs}
+      onGetModStats={getModStats}
       onDeleteMessage={deleteMessage}
       onClearChannel={clearChannel}
       onDeleteServer={deleteServer}
@@ -124,6 +139,7 @@ export default function App() {
       onUnlockChannel={unlockChannel}
       onUpdateChannelBackground={updateChannelBackground}
       onUpdateChannelDescription={updateChannelDescription}
+      onUpdateUserRole={updateUserRole}
       onSetRole={setRole}
       onSetTitle={onSetTitle}
       onSendFriendRequest={sendFriendRequest}

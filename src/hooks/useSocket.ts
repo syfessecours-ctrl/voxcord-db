@@ -14,6 +14,9 @@ export function useSocket(username: string) {
   const [privateMessages, setPrivateMessages] = useState<Record<string, PrivateMessage[]>>({});
   const [serverMembers, setServerMembers] = useState<string[]>([]);
   const [serverMemberDetails, setServerMemberDetails] = useState<User[]>([]);
+  const [modBans, setModBans] = useState<any[]>([]);
+  const [modLogs, setModLogs] = useState<any[]>([]);
+  const [modStats, setModStats] = useState<any>(null);
   const [activeServer, setActiveServer] = useState<string | null>(null);
   const [activeChannel, setActiveChannel] = useState('general');
   const [activePrivateChat, setActivePrivateChat] = useState<string | null>(null);
@@ -102,6 +105,18 @@ export function useSocket(username: string) {
 
     newSocket.on('server_member_details', ({ serverId, details }) => {
       setServerMemberDetails(details);
+    });
+
+    newSocket.on('mod_bans_list', (bans) => {
+      setModBans(bans);
+    });
+
+    newSocket.on('mod_logs_list', (logs) => {
+      setModLogs(logs);
+    });
+
+    newSocket.on('mod_stats', (stats) => {
+      setModStats(stats);
     });
 
     newSocket.on('friend_status_update', ({ username, status }) => {
@@ -436,6 +451,26 @@ export function useSocket(username: string) {
     socketRef.current?.emit('private_call_signal', { to, signal });
   };
 
+  const unbanUser = (ip?: string, username?: string) => {
+    socketRef.current?.emit('mod_unban', { ip, username });
+  };
+
+  const getModBans = () => {
+    socketRef.current?.emit('mod_get_bans');
+  };
+
+  const getModLogs = () => {
+    socketRef.current?.emit('mod_get_logs');
+  };
+
+  const getModStats = () => {
+    socketRef.current?.emit('mod_get_stats');
+  };
+
+  const updateUserRole = (targetUsername: string, role?: string, color?: string) => {
+    socketRef.current?.emit('update_user_role', { targetUsername, role, color });
+  };
+
   return {
     isLoggedIn,
     users,
@@ -447,6 +482,9 @@ export function useSocket(username: string) {
     privateMessages,
     serverMembers,
     serverMemberDetails,
+    modBans,
+    modLogs,
+    modStats,
     activeServer,
     activeChannel,
     activePrivateChat,
@@ -476,6 +514,10 @@ export function useSocket(username: string) {
     switchPrivateChat,
     kickUser,
     banUser,
+    unbanUser,
+    getModBans,
+    getModLogs,
+    getModStats,
     deleteMessage,
     clearChannel,
     deleteServer,
@@ -486,6 +528,7 @@ export function useSocket(username: string) {
     unlockChannel,
     updateChannelBackground,
     updateChannelDescription,
+    updateUserRole,
     setRole,
     onSetTitle: setTitle,
     switchChannel,
