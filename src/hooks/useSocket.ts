@@ -381,6 +381,10 @@ export function useSocket(username: string) {
     socketRef.current?.emit('update_app_ringtone', ringtoneUrl);
   };
 
+  const updateAppCallBanner = (bannerUrl: string) => {
+    socketRef.current?.emit('update_app_call_banner', bannerUrl);
+  };
+
   const sendVoiceSignal = (to: string, signal: any) => {
     socketRef.current?.emit('voice_signal', { to, signal });
   };
@@ -391,8 +395,8 @@ export function useSocket(username: string) {
     window.location.reload();
   };
 
-  const updateCallSettings = (soundsEnabled: boolean, ringtoneUrl?: string) => {
-    socketRef.current?.emit('update_call_settings', { soundsEnabled, ringtoneUrl });
+  const updateCallSettings = (soundsEnabled: boolean) => {
+    socketRef.current?.emit('update_call_settings', { soundsEnabled });
   };
 
   const initPrivateCall = (to: string, peerId: string) => {
@@ -445,6 +449,7 @@ export function useSocket(username: string) {
     onUpdateProfile: updateProfile,
     onUpdateAppLogo: updateAppLogo,
     onUpdateAppRingtone: updateAppRingtone,
+    onUpdateAppCallBanner: updateAppCallBanner,
     onUpdateServer: updateServer,
     onResetServerIcon: resetServerIcon,
     onResetServerBanner: resetServerBanner,

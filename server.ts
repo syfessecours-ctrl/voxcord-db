@@ -389,8 +389,7 @@ async function startServer() {
         bio: userRecord.bio,
         canSendLargeVideos: !!userRecord.can_send_large_videos,
         canUseGifs: !!userRecord.can_use_gifs,
-        callSoundsEnabled: !!userRecord.call_sounds_enabled,
-        ringtoneUrl: userRecord.ringtone_url
+        callSoundsEnabled: !!userRecord.call_sounds_enabled
       });
       socket.join('general');
       
@@ -403,8 +402,7 @@ async function startServer() {
         bio: userRecord.bio,
         canSendLargeVideos: !!userRecord.can_send_large_videos,
         canUseGifs: !!userRecord.can_use_gifs,
-        callSoundsEnabled: !!userRecord.call_sounds_enabled,
-        ringtoneUrl: userRecord.ringtone_url
+        callSoundsEnabled: !!userRecord.call_sounds_enabled
       });
       
       // Auto-join global server members if not already
@@ -761,16 +759,15 @@ async function startServer() {
       });
     });
 
-    socket.on("update_call_settings", async ({ soundsEnabled, ringtoneUrl }) => {
+    socket.on("update_call_settings", async ({ soundsEnabled }) => {
       const user = users.get(socket.id);
       if (!user) return;
       
-      await execute("UPDATE users SET call_sounds_enabled = ?, ringtone_url = ? WHERE username = ?", [soundsEnabled, ringtoneUrl, user.username]);
+      await execute("UPDATE users SET call_sounds_enabled = ? WHERE username = ?", [soundsEnabled, user.username]);
       
       for (const [sid, u] of users.entries()) {
         if (u.username === user.username) {
           u.callSoundsEnabled = soundsEnabled;
-          u.ringtoneUrl = ringtoneUrl;
           
           io.to(sid).emit("me", { 
             username: u.username, 
@@ -781,8 +778,7 @@ async function startServer() {
             banner: u.banner,
             canSendLargeVideos: u.canSendLargeVideos,
             canUseGifs: u.canUseGifs,
-            callSoundsEnabled: soundsEnabled, 
-            ringtoneUrl 
+            callSoundsEnabled: soundsEnabled
           });
         }
       }
@@ -1239,6 +1235,15 @@ async function startServer() {
       if (!user || user.role !== 'owner') return;
 
       await execute("INSERT INTO app_config (key, value) VALUES ('default_ringtone', ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [ringtoneUrl]);
+      const appConfig = await getAppConfig();
+      io.emit("app_config", appConfig);
+    });
+
+    socket.on("update_app_call_banner", async (bannerUrl) => {
+      const user = users.get(socket.id);
+      if (!user || user.role !== 'owner') return;
+
+      await execute("INSERT INTO app_config (key, value) VALUES ('default_call_banner', ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [bannerUrl]);
       const appConfig = await getAppConfig();
       io.emit("app_config", appConfig);
     });

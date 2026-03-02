@@ -79,6 +79,7 @@ interface ChatInterfaceProps {
   onUpdateProfile: (profile: { displayName?: string, avatar?: string, banner?: string, bio?: string }) => void;
   onUpdateAppLogo: (logoUrl: string) => void;
   onUpdateAppRingtone: (ringtoneUrl: string) => void;
+  onUpdateAppCallBanner: (bannerUrl: string) => void;
   onUpdateServer: (serverId: string, name: string, icon: string, banner: string) => void;
   onResetServerIcon: (serverId: string) => void;
   onResetServerBanner: (serverId: string) => void;
@@ -94,7 +95,7 @@ interface ChatInterfaceProps {
   onRejectPrivateCall: (to: string) => void;
   onEndPrivateCall: (to: string) => void;
   onSendPrivateCallSignal: (to: string, signal: any) => void;
-  onUpdateCallSettings: (soundsEnabled: boolean, ringtoneUrl?: string) => void;
+  onUpdateCallSettings: (soundsEnabled: boolean) => void;
 }
 
 // Helper component for remote video to handle srcObject correctly
@@ -178,6 +179,7 @@ export function ChatInterface({
   onUpdateProfile,
   onUpdateAppLogo,
   onUpdateAppRingtone,
+  onUpdateAppCallBanner,
   onUpdateServer,
   onResetServerIcon,
   onResetServerBanner,
@@ -258,7 +260,7 @@ export function ChatInterface({
 
   // Initialize ringtone audio
   useEffect(() => {
-    const currentRingtone = me?.ringtoneUrl || appConfig.default_ringtone || DEFAULT_RINGTONE_URL;
+    const currentRingtone = appConfig.default_ringtone || DEFAULT_RINGTONE_URL;
     const directUrl = getDirectUrl(currentRingtone);
     console.log("[Audio] Setting ringtone source:", directUrl);
     
@@ -270,7 +272,7 @@ export function ChatInterface({
         ringtoneAudioRef.current.play().catch(err => console.error("[Audio] Play failed after src change:", err));
       }
     }
-  }, [me?.ringtoneUrl, appConfig.default_ringtone]);
+  }, [appConfig.default_ringtone]);
 
   // Handle ringtone playback state changes
   useEffect(() => {
@@ -2479,7 +2481,7 @@ export function ChatInterface({
                     <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Call Sounds</div>
                   </div>
                   <button 
-                    onClick={() => onUpdateCallSettings(!(me?.callSoundsEnabled !== false), me?.ringtoneUrl)}
+                    onClick={() => onUpdateCallSettings(!(me?.callSoundsEnabled !== false))}
                     className={cn(
                       "w-14 h-8 rounded-full transition-all relative p-1",
                       (me?.callSoundsEnabled !== false) ? "bg-fit-primary" : "bg-fit-sidebar"
@@ -2492,46 +2494,17 @@ export function ChatInterface({
                   </button>
                 </div>
 
-                <div className="p-6 bg-fit-bg rounded-[2rem] border border-fit-border">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <div className="text-sm font-black text-fit-text mb-1">Sonnerie personnalisée</div>
-                      <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Custom Ringtone</div>
+                {isOwner && (
+                  <div className="p-6 bg-fit-bg rounded-[2rem] border border-fit-border">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <div className="text-sm font-black text-fit-text mb-1">Sonnerie Globale</div>
+                        <div className="text-[9px] text-fit-muted font-black uppercase tracking-[0.2em] opacity-50">Global Ringtone</div>
+                      </div>
                     </div>
-                    {me?.ringtoneUrl && (
-                      <button 
-                        onClick={() => onUpdateCallSettings(me?.callSoundsEnabled !== false, undefined)}
-                        className="p-2 text-fit-muted hover:text-fit-accent transition-all"
-                        title="Réinitialiser la sonnerie"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </div>
-                  
-                  <div className="flex flex-col gap-2">
-                    <button 
-                      onClick={() => onUpdateCallSettings(me?.callSoundsEnabled !== false, DEFAULT_RINGTONE_URL)}
-                      className={cn(
-                        "w-full py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2",
-                        me?.ringtoneUrl === DEFAULT_RINGTONE_URL 
-                          ? "bg-fit-primary text-white" 
-                          : "bg-fit-primary/10 text-fit-primary hover:bg-fit-primary/20"
-                      )}
-                    >
-                      <Volume2 size={14} />
-                      Utiliser Sonnerie Kalash (Booba x Kaaris)
-                    </button>
                     
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => ringtoneInputRef.current?.click()}
-                        disabled={isRingtoneUploading}
-                        className="flex-1 py-3 bg-white/5 text-fit-text rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all disabled:opacity-50"
-                      >
-                        {isRingtoneUploading ? "Envoi..." : me?.ringtoneUrl ? "Changer Sonnerie" : "Choisir MP3"}
-                      </button>
-                      {isOwner && (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
                         <button 
                           onClick={() => {
                             const input = document.createElement('input');
@@ -2557,43 +2530,46 @@ export function ChatInterface({
                             input.click();
                           }}
                           disabled={isRingtoneUploading}
-                          className="px-4 py-3 bg-fit-primary/20 text-fit-primary rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-fit-primary/30 transition-all disabled:opacity-50"
-                          title="Définir comme sonnerie par défaut pour tous"
+                          className="flex-1 py-3 bg-fit-primary/20 text-fit-primary rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-fit-primary/30 transition-all disabled:opacity-50"
                         >
-                          DÉFINIR GLOBAL
+                          {isRingtoneUploading ? "Envoi..." : "Changer Sonnerie Globale"}
                         </button>
-                      )}
-                      <input 
-                        type="file" 
-                        ref={ringtoneInputRef} 
-                        className="hidden" 
-                        accept="audio/mpeg,audio/mp3" 
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          
-                          setIsRingtoneUploading(true);
-                          const formData = new FormData();
-                          formData.append('file', file);
-                          
-                          try {
-                            const res = await fetch('/api/upload', {
-                              method: 'POST',
-                              body: formData
-                            });
-                            const data = await res.json();
-                            onUpdateCallSettings(me?.callSoundsEnabled !== false, data.url);
-                          } catch (err) {
-                            console.error("Error uploading ringtone:", err);
-                            showAlert("Erreur lors de l'envoi de la sonnerie.");
-                          } finally {
-                            setIsRingtoneUploading(false);
-                          }
-                        }} 
-                      />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      <label className="block text-[10px] font-black text-fit-muted uppercase tracking-[0.2em] ml-1">Image d'appel globale (60%)</label>
+                      <button 
+                        onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = 'image/*';
+                          input.onchange = async (e: any) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setIsUploading(true);
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            try {
+                              const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                              const data = await res.json();
+                              onUpdateAppCallBanner(data.url);
+                              showAlert("Image d'appel globale mise à jour !");
+                            } catch (err) {
+                              showAlert("Erreur lors de l'envoi.");
+                            } finally {
+                              setIsUploading(false);
+                            }
+                          };
+                          input.click();
+                        }}
+                        className="w-full py-3 bg-fit-primary/10 text-fit-primary border border-fit-primary/20 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-fit-primary/20 transition-all"
+                      >
+                        Changer l'image globale d'appel
+                      </button>
                     </div>
                   </div>
-                </div>
+                )}
 
                 <div className="p-6 bg-amber-500/10 border border-amber-500/20 rounded-[2rem] flex gap-4">
                   <ShieldAlert size={24} className="text-amber-500 flex-shrink-0" />
@@ -3364,7 +3340,7 @@ export function ChatInterface({
                 "bg-fit-surface border border-fit-border shadow-2xl overflow-hidden relative transition-all duration-500",
                 privateCall.isMinimized 
                   ? "w-16 h-16 rounded-full cursor-pointer hover:scale-110 active:scale-95" 
-                  : "w-full max-w-md rounded-[2.5rem]"
+                  : "w-full max-w-md aspect-square rounded-[2.5rem]"
               )}
               onClick={() => {
                 if (privateCall.isMinimized) {
@@ -3385,40 +3361,37 @@ export function ChatInterface({
                 <>
                   {/* Call Background with Fade */}
                   <div className="absolute inset-0 z-0 bg-[#1a1b1e] overflow-hidden">
-                    {/* Bottom Image (Kaaris) - Base layer with mask */}
+                    {/* Bottom Image (Global/Owner) - 60% of height */}
                     <div 
-                      className="absolute inset-0 w-full h-full"
+                      className="absolute bottom-0 left-0 w-full h-[60%]"
                       style={{
-                        backgroundImage: `url(${getDirectUrl(KAARIS_BANNER)})`,
+                        backgroundImage: `url(${getDirectUrl(appConfig.default_call_banner || KAARIS_BANNER)})`,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
-                        opacity: 0.8,
-                        maskImage: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 90%)',
-                        WebkitMaskImage: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 90%)'
+                        opacity: 0.9,
                       }}
                     />
                     
-                    {/* Top Image (Banner) - Masked layer */}
+                    {/* Top Image (Caller Banner) - 40% of height */}
                     <AnimatePresence mode="wait">
                       <motion.div
-                        key={privateCall.banner || appConfig.default_call_banner}
+                        key={privateCall.banner}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 1.2 }}
-                        className="absolute inset-0 w-full h-full"
+                        className="absolute top-0 left-0 w-full h-[40%]"
                         style={{
-                          backgroundImage: `url(${getDirectUrl(privateCall.banner || appConfig.default_call_banner || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000")})`,
+                          backgroundImage: `url(${getDirectUrl(privateCall.banner || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000")})`,
                           backgroundSize: 'cover',
                           backgroundPosition: 'center',
-                          maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 90%)',
-                          WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 90%)'
                         }}
                       />
                     </AnimatePresence>
                     
                     {/* Dark gradient overlays for text readability */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#1a1b1e] via-transparent to-black/40" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#1a1b1e] via-transparent to-black/20" />
+                    <div className="absolute top-[40%] left-0 w-full h-px bg-white/10 shadow-[0_0_15px_rgba(255,255,255,0.1)]" />
                   </div>
 
                   {/* Minimize Button */}
@@ -3432,45 +3405,47 @@ export function ChatInterface({
                     <Minimize2 size={16} />
                   </button>
 
-                  <div className="px-8 pb-12 pt-20 relative z-10 flex flex-col items-center text-center w-full h-full justify-center">
-                    {/* Avatar - Rounded Square like in the image */}
-                    <div className="relative mb-10">
-                      <motion.div 
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="w-36 h-36 rounded-[2.5rem] bg-[#2a2d31] border-[8px] border-[#1a1b1e] shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex items-center justify-center"
-                      >
-                        {privateCall.avatar ? (
-                          <img src={getDirectUrl(privateCall.avatar)} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        ) : (
-                          <span className="text-white font-black text-5xl">{privateCall.otherUser[0]?.toUpperCase()}</span>
+                  <div className="px-8 pb-12 pt-10 relative z-10 flex flex-col items-center text-center w-full h-full justify-between">
+                    <div className="flex flex-col items-center">
+                      {/* Avatar - Rounded Square like in the image */}
+                      <div className="relative mb-6">
+                        <motion.div 
+                          initial={{ scale: 0.9, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          className="w-32 h-32 rounded-[2.5rem] bg-[#2a2d31] border-[8px] border-[#1a1b1e] shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex items-center justify-center"
+                        >
+                          {privateCall.avatar ? (
+                            <img src={getDirectUrl(privateCall.avatar)} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <span className="text-white font-black text-5xl">{privateCall.otherUser[0]?.toUpperCase()}</span>
+                          )}
+                        </motion.div>
+                        {privateCall.status === 'active' && (
+                          <div className="absolute -bottom-1 -right-1 bg-emerald-500 w-10 h-10 rounded-full border-[6px] border-[#1a1b1e] flex items-center justify-center">
+                            <div className="w-2.5 h-2.5 bg-white rounded-full animate-ping" />
+                          </div>
                         )}
-                      </motion.div>
-                      {privateCall.status === 'active' && (
-                        <div className="absolute -bottom-1 -right-1 bg-emerald-500 w-10 h-10 rounded-full border-[6px] border-[#1a1b1e] flex items-center justify-center">
-                          <div className="w-2.5 h-2.5 bg-white rounded-full animate-ping" />
-                        </div>
-                      )}
-                    </div>
+                      </div>
 
-                    <div className="flex flex-col items-center gap-2 mb-14">
-                      <h2 className="text-4xl font-black text-white tracking-tight drop-shadow-lg uppercase">
-                        {privateCall.displayName || privateCall.otherUser}
-                      </h2>
-                      
-                      {privateCall.status === 'calling' && (
-                        <span className="text-fit-primary font-black text-[11px] uppercase tracking-[0.3em] opacity-90 drop-shadow-md">Appel en cours...</span>
-                      )}
-                      {privateCall.status === 'incoming' && (
-                        <span className="text-[#ff4b5c] font-black text-[11px] uppercase tracking-[0.3em] drop-shadow-md">Appel entrant</span>
-                      )}
-                      {privateCall.status === 'active' && (
-                        <span className="text-emerald-500 font-black text-[11px] uppercase tracking-[0.3em] drop-shadow-md">En communication</span>
-                      )}
+                      <div className="flex flex-col items-center gap-2">
+                        <h2 className="text-3xl font-black text-white tracking-tight drop-shadow-lg uppercase">
+                          {privateCall.displayName || privateCall.otherUser}
+                        </h2>
+                        
+                        {privateCall.status === 'calling' && (
+                          <span className="text-fit-primary font-black text-[11px] uppercase tracking-[0.3em] opacity-90 drop-shadow-md">Appel en cours...</span>
+                        )}
+                        {privateCall.status === 'incoming' && (
+                          <span className="text-[#ff4b5c] font-black text-[11px] uppercase tracking-[0.3em] drop-shadow-md">Appel entrant</span>
+                        )}
+                        {privateCall.status === 'active' && (
+                          <span className="text-emerald-500 font-black text-[11px] uppercase tracking-[0.3em] drop-shadow-md">En communication</span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Call Actions */}
-                    <div className="flex flex-col items-center gap-6">
+                    <div className="flex flex-col items-center gap-6 mb-4">
                       <div className="flex items-center gap-10">
                         {privateCall.status === 'incoming' ? (
                           <>
