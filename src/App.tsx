@@ -21,6 +21,7 @@ export default function App() {
     serverMembers,
     serverMemberDetails,
     modBans,
+    modKicks,
     modLogs,
     modStats,
     activeServer,
@@ -54,7 +55,9 @@ export default function App() {
     kickUser,
     banUser,
     unbanUser,
+    unkickUser,
     getModBans,
+    getModKicks,
     getModLogs,
     getModStats,
     deleteMessage,
@@ -145,6 +148,7 @@ export default function App() {
         serverMembers={serverMembers}
         serverMemberDetails={serverMemberDetails}
         modBans={modBans}
+        modKicks={modKicks}
         modLogs={modLogs}
         modStats={modStats}
         activeServer={activeServer}
@@ -164,7 +168,9 @@ export default function App() {
         onKickUser={kickUser}
         onBanUser={banUser}
         onUnbanUser={unbanUser}
+        onUnkickUser={unkickUser}
         onGetModBans={getModBans}
+        onGetModKicks={getModKicks}
         onGetModLogs={getModLogs}
         onGetModStats={getModStats}
         onDeleteMessage={deleteMessage}

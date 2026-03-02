@@ -98,6 +98,13 @@ async function initDb() {
       role_color TEXT DEFAULT '#ffffff'
     );
 
+    CREATE TABLE IF NOT EXISTS kicked_users (
+      username TEXT PRIMARY KEY,
+      reason TEXT,
+      ends_at TEXT,
+      timestamp TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS messages (
       id SERIAL PRIMARY KEY,
       channel_id TEXT,
@@ -360,6 +367,26 @@ async function startServer() {
       const isBanned = await getOne("SELECT * FROM banned_ips WHERE ip = ?", [clientIp]);
       if (isBanned) return socket.emit("login_error", `Vous êtes banni. Raison: ${isBanned.reason}`);
 
+      // Check if user is kicked
+      const kickRecord = await getOne("SELECT * FROM kicked_users WHERE username = ?", [username]);
+      if (kickRecord) {
+        const now = new Date();
+        const endsAt = new Date(kickRecord.ends_at);
+        if (now < endsAt) {
+          const kickConfig = await getAppConfig();
+          return socket.emit("kicked", {
+            reason: kickRecord.reason,
+            title: kickConfig.kick_title || "Pause Communautaire",
+            message: kickConfig.kick_message || "Votre accès est temporairement restreint.",
+            image: kickConfig.kick_image,
+            endsAt: kickRecord.ends_at
+          });
+        } else {
+          // Kick expired
+          await execute("DELETE FROM kicked_users WHERE username = ?", [username]);
+        }
+      }
+
       let userRecord = await getOne("SELECT * FROM users WHERE username = ?", [username]);
       
       if (userRecord) {
@@ -530,7 +557,12 @@ async function startServer() {
 
     socket.on("create_channel", async ({ serverId, name, type }) => {
       const user = users.get(socket.id);
-      if (!user || user.role !== 'owner') return;
+      if (!user) return;
+      
+      // Check if user is global owner or server owner
+      const server = await getOne("SELECT * FROM servers WHERE id = ?", [serverId]);
+      if (!server) return;
+      if (user.role !== 'owner' && server.owner !== user.username) return;
       
       const channelId = `ch-${Math.random().toString(36).substr(2, 9)}`;
       await execute("INSERT INTO channels (id, name, type, server_id) VALUES (?, ?, ?, ?)", [channelId, name, type || 'text', serverId]);
@@ -1014,12 +1046,17 @@ async function startServer() {
       const targetSocketId = Array.from(users.entries()).find(([id, u]) => u.username === targetUsername)?.[0];
       if (targetSocketId) {
         const kickConfig = await getAppConfig();
+        const endsAt = new Date(Date.now() + 1000 * 60 * 60 * 2).toISOString(); // 2h kick
+        
+        await execute("INSERT INTO kicked_users (username, reason, ends_at, timestamp) VALUES (?, ?, ?, ?) ON CONFLICT (username) DO UPDATE SET reason = EXCLUDED.reason, ends_at = EXCLUDED.ends_at, timestamp = EXCLUDED.timestamp", 
+          [targetUsername, reason, endsAt, new Date().toISOString()]);
+
         io.to(targetSocketId).emit("kicked", { 
           reason, 
           title: kickConfig.kick_title || "Pause Communautaire",
           message: kickConfig.kick_message || "Votre accès est temporairement restreint.",
           image: kickConfig.kick_image,
-          endsAt: new Date(Date.now() + 1000 * 60 * 60 * 2).toISOString() // Default 2h for now
+          endsAt: endsAt
         });
         
         // Give client time to show the screen before disconnecting
@@ -1074,6 +1111,22 @@ async function startServer() {
       if (!admin || admin.role !== 'owner') return;
       const bans = await query("SELECT * FROM banned_ips");
       socket.emit("mod_bans_list", bans);
+    });
+
+    socket.on("mod_get_kicks", async () => {
+      const admin = users.get(socket.id);
+      if (!admin || (admin.role !== 'owner' && admin.role !== 'moderator')) return;
+      const kicks = await query("SELECT * FROM kicked_users ORDER BY timestamp DESC");
+      socket.emit("mod_kicks_list", kicks);
+    });
+
+    socket.on("mod_unkick", async (targetUsername) => {
+      const admin = users.get(socket.id);
+      if (!admin || (admin.role !== 'owner' && admin.role !== 'moderator')) return;
+      await execute("DELETE FROM kicked_users WHERE username = ?", [targetUsername]);
+      const kicks = await query("SELECT * FROM kicked_users ORDER BY timestamp DESC");
+      socket.emit("mod_kicks_list", kicks);
+      await execute("INSERT INTO mod_logs (admin, action, target, reason, timestamp) VALUES (?, ?, ?, ?, ?)", [admin.username, 'unkick', targetUsername, 'Kick levé par modérateur', new Date().toISOString()]);
     });
 
     socket.on("mod_get_stats", async () => {
@@ -1379,10 +1432,15 @@ async function startServer() {
 
     socket.on("mod_delete_channel", async (channelId) => {
       const admin = users.get(socket.id);
-      if (!admin || admin.role !== 'owner') return;
+      if (!admin) return;
 
       const channel = await getOne("SELECT * FROM channels WHERE id = ?", [channelId]);
       if (!channel) return;
+
+      // Check if user is global owner or server owner
+      const server = await getOne("SELECT * FROM servers WHERE id = ?", [channel.server_id]);
+      if (!server) return;
+      if (admin.role !== 'owner' && server.owner !== admin.username) return;
 
       await execute("DELETE FROM messages WHERE channel_id = ?", [channelId]);
       await execute("DELETE FROM channels WHERE id = ?", [channelId]);

@@ -82,16 +82,6 @@ export const KickScreen: React.FC<KickScreenProps> = ({ config, onClose }) => {
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0D0C10]/95 backdrop-blur-md p-4 md:p-8"
     >
       {renderLayout()}
-      
-      {/* Demo Close Button */}
-      {onClose && (
-        <button 
-          onClick={onClose}
-          className="fixed top-6 right-6 text-white/30 hover:text-white transition-colors"
-        >
-          Fermer la démo
-        </button>
-      )}
     </motion.div>
   );
 };
@@ -179,11 +169,11 @@ const BannerLayout: React.FC<{ config: KickConfig; timeLeft: string; progress: n
 
 const ImmersiveLayout: React.FC<{ config: KickConfig; timeLeft: string; progress: number }> = ({ config, timeLeft, progress }) => (
   <div className="relative w-full max-w-4xl h-[600px] flex items-center justify-center overflow-hidden rounded-3xl shadow-2xl border border-white/10">
-    {/* Background Image with Blur */}
+    {/* Background Image */}
     <div className="absolute inset-0 z-0">
       <img
         src={config.imageUrl}
-        className="w-full h-full object-cover blur-2xl opacity-30 scale-110"
+        className="w-full h-full object-cover opacity-30 scale-105 transition-transform duration-[20s]"
         referrerPolicy="no-referrer"
       />
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0D0C10]/80 to-[#0D0C10]" />

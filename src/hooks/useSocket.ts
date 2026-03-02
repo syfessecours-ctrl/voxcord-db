@@ -15,6 +15,7 @@ export function useSocket(username: string) {
   const [serverMembers, setServerMembers] = useState<string[]>([]);
   const [serverMemberDetails, setServerMemberDetails] = useState<User[]>([]);
   const [modBans, setModBans] = useState<any[]>([]);
+  const [modKicks, setModKicks] = useState<any[]>([]);
   const [modLogs, setModLogs] = useState<any[]>([]);
   const [modStats, setModStats] = useState<any>(null);
   const [activeServer, setActiveServer] = useState<string | null>(null);
@@ -119,6 +120,10 @@ export function useSocket(username: string) {
 
     newSocket.on('mod_bans_list', (bans) => {
       setModBans(bans);
+    });
+
+    newSocket.on('mod_kicks_list', (kicks) => {
+      setModKicks(kicks);
     });
 
     newSocket.on('mod_logs_list', (logs) => {
@@ -473,6 +478,14 @@ export function useSocket(username: string) {
     socketRef.current?.emit('mod_get_bans');
   };
 
+  const getModKicks = () => {
+    socketRef.current?.emit('mod_get_kicks');
+  };
+
+  const unkickUser = (targetUsername: string) => {
+    socketRef.current?.emit('mod_unkick', targetUsername);
+  };
+
   const getModLogs = () => {
     socketRef.current?.emit('mod_get_logs');
   };
@@ -497,6 +510,7 @@ export function useSocket(username: string) {
     serverMembers,
     serverMemberDetails,
     modBans,
+    modKicks,
     modLogs,
     modStats,
     activeServer,
@@ -530,7 +544,9 @@ export function useSocket(username: string) {
     kickUser,
     banUser,
     unbanUser,
+    unkickUser,
     getModBans,
+    getModKicks,
     getModLogs,
     getModStats,
     deleteMessage,

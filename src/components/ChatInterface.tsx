@@ -55,6 +55,7 @@ interface ChatInterfaceProps {
   serverMembers: string[];
   serverMemberDetails: User[];
   modBans: any[];
+  modKicks: any[];
   modLogs: any[];
   modStats: any;
   activeServer: string | null;
@@ -74,7 +75,9 @@ interface ChatInterfaceProps {
   onKickUser: (targetUsername: string, reason: string) => void;
   onBanUser: (targetUsername: string, reason: string) => void;
   onUnbanUser: (ip?: string, username?: string) => void;
+  onUnkickUser: (username: string) => void;
   onGetModBans: () => void;
+  onGetModKicks: () => void;
   onGetModLogs: () => void;
   onGetModStats: () => void;
   onDeleteMessage: (messageId: number) => void;
@@ -240,6 +243,7 @@ export function ChatInterface({
   serverMembers,
   serverMemberDetails,
   modBans,
+  modKicks,
   modLogs,
   modStats,
   activeServer,
@@ -258,7 +262,9 @@ export function ChatInterface({
   onKickUser,
   onBanUser,
   onUnbanUser,
+  onUnkickUser,
   onGetModBans,
+  onGetModKicks,
   onGetModLogs,
   onGetModStats,
   onDeleteMessage,
@@ -429,7 +435,7 @@ export function ChatInterface({
   const [showAnimeAnimation, setShowAnimeAnimation] = useState(false);
   const [lastAnimatedChannel, setLastAnimatedChannel] = useState<string | null>(null);
   const [showModPanel, setShowModPanel] = useState(false);
-  const [modPanelTab, setModPanelTab] = useState<'logs' | 'bans' | 'stats'>('logs');
+  const [modPanelTab, setModPanelTab] = useState<'logs' | 'bans' | 'kicks' | 'stats'>('logs');
   const [roleColorInput, setRoleColorInput] = useState('#ffffff');
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1417,6 +1423,7 @@ export function ChatInterface({
               onClick={() => {
                 onGetModBans();
                 onGetModLogs();
+                onGetModKicks();
                 setShowModPanel(true);
               }}
               className={cn(
@@ -3925,14 +3932,30 @@ export function ChatInterface({
                   {modPanelTab === 'logs' && <motion.div layoutId="modTab" className="absolute bottom-0 left-0 w-full h-1 bg-fit-primary rounded-t-full" />}
                 </button>
                 <button 
-                  onClick={() => setModPanelTab('bans')}
+                  onClick={() => {
+                    onGetModBans();
+                    setModPanelTab('bans');
+                  }}
                   className={cn(
                     "px-6 py-4 font-black text-xs uppercase tracking-widest transition-all relative",
                     modPanelTab === 'bans' ? "text-fit-primary" : "text-fit-muted hover:text-fit-text"
                   )}
                 >
-                  Gestion des Bannissements
+                  Bannissements
                   {modPanelTab === 'bans' && <motion.div layoutId="modTab" className="absolute bottom-0 left-0 w-full h-1 bg-fit-primary rounded-t-full" />}
+                </button>
+                <button 
+                  onClick={() => {
+                    onGetModKicks();
+                    setModPanelTab('kicks');
+                  }}
+                  className={cn(
+                    "px-6 py-4 font-black text-xs uppercase tracking-widest transition-all relative",
+                    modPanelTab === 'kicks' ? "text-fit-primary" : "text-fit-muted hover:text-fit-text"
+                  )}
+                >
+                  Kicks Actifs
+                  {modPanelTab === 'kicks' && <motion.div layoutId="modTab" className="absolute bottom-0 left-0 w-full h-1 bg-fit-primary rounded-t-full" />}
                 </button>
                 <button 
                   onClick={() => {
@@ -4021,6 +4044,45 @@ export function ChatInterface({
                               className="px-4 py-2 bg-fit-accent/10 text-fit-accent hover:bg-fit-accent hover:text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
                             >
                               Révoquer
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : modPanelTab === 'kicks' ? (
+                  <div className="space-y-4">
+                    {modKicks.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-20 text-fit-muted opacity-40">
+                        <UserX size={48} className="mb-4" />
+                        <p className="font-black text-xs uppercase tracking-widest">Aucun kick actif</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-3">
+                        {modKicks.map((kick: any) => (
+                          <div key={kick.username} className="bg-fit-surface p-4 rounded-2xl border border-fit-border flex items-center justify-between group hover:border-amber-500/30 transition-all">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 bg-amber-500/10 text-amber-500 rounded-xl flex items-center justify-center">
+                                <UserX size={18} />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-black text-xs text-fit-text">@{kick.username}</span>
+                                </div>
+                                <p className="text-[10px] font-medium text-fit-muted mt-1 italic">Raison: {kick.reason}</p>
+                                <p className="text-[9px] font-bold text-fit-muted/50 uppercase tracking-widest mt-1">
+                                  Expire le {new Date(kick.ends_at).toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => {
+                                onUnkickUser(kick.username);
+                                showAlert(`Kick révoqué pour @${kick.username}`);
+                              }}
+                              className="px-4 py-2 bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+                            >
+                              Lever le kick
                             </button>
                           </div>
                         ))}
