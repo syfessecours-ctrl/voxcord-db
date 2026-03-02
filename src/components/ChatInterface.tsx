@@ -869,11 +869,6 @@ export function ChatInterface({
           banner: targetUser?.banner,
           isMinimized: false
         });
-        // Toujours tenter de jouer la sonnerie, sauf si explicitement désactivé
-        if (me?.callSoundsEnabled !== false) {
-          console.log("[Audio] Triggering outgoing ringtone");
-          setIsPlayingRingtone(true);
-        }
         onInitPrivateCall(targetUsername, id);
       });
 
