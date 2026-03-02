@@ -229,7 +229,7 @@ async function initDb() {
   await execute("INSERT INTO channels (id, name, type, server_id, description) VALUES ('anime-zone', 'anime-zone', 'text', 'fitcord-global', 'Entrée stylée garantie !') ON CONFLICT DO NOTHING");
   await execute("INSERT INTO channels (id, name, type, server_id) VALUES ('general', 'général', 'text', 'fitcord-global') ON CONFLICT DO NOTHING");
   await execute("INSERT INTO app_config (key, value) VALUES ('logo_url', 'https://picsum.photos/seed/fitcord/200/200') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
-  await execute("INSERT INTO app_config (key, value) VALUES ('default_ringtone', 'https://www.dropbox.com/scl/fi/mbqd7wa8vwsbvt1uk96fm/Booba-feat-Kaaris-Kalash-Clip-Officiel-1.mp3?rlkey=skq5teslhj6cjhqmh8l22vnrr&st=ap1lmvha&raw=1') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
+  await execute("INSERT INTO app_config (key, value) VALUES ('default_ringtone', '/src/SonnerieK.MP3') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
   await execute("INSERT INTO app_config (key, value) VALUES ('default_call_banner', 'https://www.dropbox.com/scl/fi/16fkgzy6fec6f96iubyxb/Kaaris-soutient-Aurier-dans-le-scandale-des-insultes.webp?rlkey=w7qb17whbbd12ttftfim5euwm&st=ju09pv3d&raw=1') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value");
 }
 

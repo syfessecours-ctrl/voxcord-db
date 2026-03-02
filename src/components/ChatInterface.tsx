@@ -134,7 +134,7 @@ const getDirectUrl = (url: string) => {
 };
 
 const KAARIS_BANNER = "https://www.dropbox.com/scl/fi/16fkgzy6fec6f96iubyxb/Kaaris-soutient-Aurier-dans-le-scandale-des-insultes.webp?rlkey=w7qb17whbbd12ttftfim5euwm&st=ju09pv3d&raw=1";
-const KALASH_RINGTONE_URL = "https://www.dropbox.com/scl/fi/mbqd7wa8vwsbvt1uk96fm/Booba-feat-Kaaris-Kalash-Clip-Officiel-1.mp3?rlkey=skq5teslhj6cjhqmh8l22vnrr&st=ap1lmvha&raw=1";
+const DEFAULT_RINGTONE_URL = "/src/SonnerieK.MP3";
 
 export function ChatInterface({
   username,
@@ -256,7 +256,7 @@ export function ChatInterface({
 
   // Initialize ringtone audio
   useEffect(() => {
-    const currentRingtone = me?.ringtoneUrl || appConfig.default_ringtone || KALASH_RINGTONE_URL;
+    const currentRingtone = me?.ringtoneUrl || appConfig.default_ringtone || DEFAULT_RINGTONE_URL;
     const directUrl = getDirectUrl(currentRingtone);
     console.log("[Audio] Setting ringtone source:", directUrl);
     
@@ -2509,10 +2509,10 @@ export function ChatInterface({
                   
                   <div className="flex flex-col gap-2">
                     <button 
-                      onClick={() => onUpdateCallSettings(me?.callSoundsEnabled !== false, KALASH_RINGTONE_URL)}
+                      onClick={() => onUpdateCallSettings(me?.callSoundsEnabled !== false, DEFAULT_RINGTONE_URL)}
                       className={cn(
                         "w-full py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2",
-                        me?.ringtoneUrl === KALASH_RINGTONE_URL 
+                        me?.ringtoneUrl === DEFAULT_RINGTONE_URL 
                           ? "bg-fit-primary text-white" 
                           : "bg-fit-primary/10 text-fit-primary hover:bg-fit-primary/20"
                       )}
